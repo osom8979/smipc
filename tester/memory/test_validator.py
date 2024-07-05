@@ -2,7 +2,7 @@
 
 from unittest import TestCase, main
 
-from smipc.memory.shared_memory_validator import (
+from smipc.memory.validator import (
     SharedMemoryTestInfo,
     register_shared_memory,
     validate_shared_memory,

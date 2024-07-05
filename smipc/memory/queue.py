@@ -4,7 +4,7 @@ from collections import deque
 from multiprocessing.shared_memory import SharedMemory
 from typing import Deque, Dict, Final, NamedTuple, Optional, Union
 
-from smipc.memory.shared_memory_utils import create_shared_memory, destroy_shared_memory
+from smipc.memory.utils import create_shared_memory, destroy_shared_memory
 
 SHARED_MEMORY_INFINITY_QUEUE: Final[int] = 0
 
