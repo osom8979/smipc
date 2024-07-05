@@ -32,6 +32,7 @@ ARGS=(
 print_message "black ${ARGS[*]}"
 
 "$ROOT_DIR/python" -m black "${ARGS[@]}" \
-    "$ROOT_DIR/bt_python/" \
+    "$ROOT_DIR/smipc/" \
     "$ROOT_DIR/tester/" \
-    "$ROOT_DIR/setup.py"
+    "$ROOT_DIR/setup.py" \
+    "$@"

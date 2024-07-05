@@ -1,12 +1,12 @@
-# bt-python
+# smipc
 
-[![PyPI](https://img.shields.io/pypi/v/bt-python?style=flat-square)](https://pypi.org/project/bt-python/)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/bt-python?style=flat-square)
-[![GitHub](https://img.shields.io/github/license/yourid/bt-python?style=flat-square)](https://github.com/yourid/bt-python/)
+[![PyPI](https://img.shields.io/pypi/v/smipc?style=flat-square)](https://pypi.org/project/smipc/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/smipc?style=flat-square)
+[![GitHub](https://img.shields.io/github/license/osom8979/smipc?style=flat-square)](https://github.com/osom8979/smipc/)
 
-Boilterplate Template Python Project
+Shared Memory IPC
 
 ## License
 
 See the [LICENSE](./LICENSE) file for details. In summary,
-**bt-python** is licensed under the **MIT license**.
+**smipc** is licensed under the **MIT license**.
