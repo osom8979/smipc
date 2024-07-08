@@ -7,20 +7,20 @@ from typing import Union
 class SmipcServer:
     def __init__(
         self,
-        root: Union[str, bytes, PathLike[str], PathLike[bytes]],
+        root_dir: Union[str, bytes, PathLike[str], PathLike[bytes]],
         mode=0o666,
     ):
-        self._root = root
+        self._root_dir = root_dir
         self._mode = mode
 
-    def start(self):
+    def open(self, key: str) -> None:
         pass
 
-    def stop(self):
+    def close(self, key: str) -> bytes:
         pass
 
-    def recv(self, name: str) -> bytes:
+    def recv(self, key: str) -> bytes:
         pass
 
-    def send(self, index: int, data: bytes) -> None:
+    def send(self, key: str, data: bytes) -> None:
         pass
