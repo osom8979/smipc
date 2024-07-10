@@ -3,8 +3,10 @@
 from os import PathLike
 from typing import Union
 
+from smipc.memory.queue import SharedMemoryQueue
 
-class SmipcClient:
+
+class SmipcHost:
     def __init__(
         self,
         root: Union[str, bytes, PathLike[str], PathLike[bytes]],
@@ -12,6 +14,7 @@ class SmipcClient:
     ):
         self._root = root
         self._mode = mode
+        self._sms = SharedMemoryQueue()
 
     def start(self):
         pass

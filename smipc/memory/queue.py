@@ -2,11 +2,13 @@
 
 from collections import deque
 from multiprocessing.shared_memory import SharedMemory
+from queue import Full
 from typing import Deque, Dict, Final, NamedTuple, Optional, Union
+from weakref import finalize
 
 from smipc.memory.utils import create_shared_memory, destroy_shared_memory
 
-SHARED_MEMORY_INFINITY_QUEUE: Final[int] = 0
+INFINITY_QUEUE_SIZE: Final[int] = -1
 
 
 class Written(NamedTuple):
@@ -23,61 +25,109 @@ class SharedMemoryQueue:
     _waiting: Deque[SharedMemory]
     _working: Dict[str, SharedMemory]
 
-    def __init__(self, max_queue=SHARED_MEMORY_INFINITY_QUEUE):
+    def __init__(self, max_queue=INFINITY_QUEUE_SIZE):
         self._max_queue = max_queue
         self._waiting = deque()
         self._working = dict()
+        self._finalizer = finalize(self, self._cleanup, self._waiting, self._working)
 
-    @property
-    def max_queue(self) -> int:
-        return self._max_queue
+    @staticmethod
+    def _cleanup(waiting: Deque[SharedMemory], working: Dict[str, SharedMemory]):
+        while waiting:
+            sm = waiting.popleft()
+            destroy_shared_memory(sm)
+        while working:
+            _, sm = working.popitem()
+            destroy_shared_memory(sm)
+        assert not waiting
+        assert not working
 
-    def clear_waiting(self) -> None:
+    def cleanup(self) -> None:
+        if self._finalizer.detach():
+            self._cleanup(self._waiting, self._working)
+            del self._waiting
+            del self._working
+
+    def clear_waiting(self):
         while self._waiting:
             sm = self._waiting.popleft()
             destroy_shared_memory(sm)
         assert not self._waiting
 
-    def clear_working(self) -> None:
+    def clear_working(self):
         while self._working:
             _, sm = self._working.popitem()
             destroy_shared_memory(sm)
         assert not self._working
 
-    def clear(self) -> None:
+    def clear(self):
         self.clear_waiting()
         self.clear_working()
 
+    @property
+    def max_queue(self) -> int:
+        return self._max_queue
+
+    @property
+    def has_queue_limitation(self) -> bool:
+        return self._max_queue > 0
+
+    @property
+    def is_infinity(self) -> bool:
+        return not self.has_queue_limitation
+
+    @property
     def size_waiting(self) -> int:
         return len(self._waiting)
 
+    @property
     def size_working(self) -> int:
         return len(self._working)
+
+    @property
+    def size(self) -> int:
+        return self.size_waiting + self.size_working
+
+    @property
+    def is_full(self) -> bool:
+        if self.is_infinity:
+            return False
+        if self.size_waiting >= 1:
+            return False
+        return self.size_waiting >= self._max_queue
 
     def find_working(self, key: str) -> SharedMemory:
         return self._working[key]
 
-    def secure_worker(self, size: int) -> SharedMemory:
-        try:
+    def _add_worker_safe(self, buffer_size: int) -> SharedMemory:
+        if self.is_full:
+            raise Full
+
+        if len(self._waiting) >= 1:
             sm = self._waiting.popleft()
-            if sm.size < size:
+            if sm.size < buffer_size:
                 destroy_shared_memory(sm)
-                raise BufferError
-        except (IndexError, BufferError):
-            sm = create_shared_memory(size)
+                sm = create_shared_memory(buffer_size)
+        else:
+            sm = create_shared_memory(buffer_size)
+
         assert sm is not None
+        assert sm.size >= buffer_size
         self._working[sm.name] = sm
         return sm
+
+    def write_bytes(self, data: bytes, offset=0) -> Written:
+        end = offset + len(data)
+        sm = self._add_worker_safe(end)
+        sm.buf[offset:end] = data
+        return Written(sm.name, offset, end)
 
     def write(self, data: Union[bytes, memoryview], offset=0) -> Written:
         if isinstance(data, memoryview):
             return self.write(data.tobytes(), offset)
-
-        assert isinstance(data, bytes)
-        end = offset + len(data)
-        sm = self.secure_worker(end)
-        sm.buf[offset:end] = data
-        return Written(sm.name, offset, end)
+        else:
+            assert isinstance(data, bytes)
+            return self.write_bytes(data, offset)
 
     def restore(self, name: str) -> None:
         self._waiting.append(self._working.pop(name))
@@ -85,13 +135,16 @@ class SharedMemoryQueue:
     @staticmethod
     def read(name: str, offset=0, size: Optional[int] = None) -> bytes:
         sm = SharedMemory(name=name)
-        if size is None:
-            return bytes(sm.buf[offset:])
-        else:
-            if size <= 0:
-                raise ValueError("The 'size' argument must be greater than 0")
-            end = offset + size
-            return bytes(sm.buf[offset:end])
+        try:
+            if size is None:
+                return bytes(sm.buf[offset:])
+            else:
+                if size <= 0:
+                    raise ValueError("The 'size' argument must be greater than 0")
+                end = offset + size
+                return bytes(sm.buf[offset:end])
+        finally:
+            sm.close()
 
     class RentalManager:
         __slots__ = ("_sm", "_smq")
@@ -107,7 +160,7 @@ class SharedMemoryQueue:
             self._smq.restore(self._sm.name)
 
     def rent(self, buffer_byte: int) -> RentalManager:
-        return self.RentalManager(self.secure_worker(buffer_byte), self)
+        return self.RentalManager(self._add_worker_safe(buffer_byte), self)
 
     class MultiRentalManager:
         __slots__ = ("_sms", "_smq")
@@ -127,7 +180,17 @@ class SharedMemoryQueue:
         if rental_size <= 0 or buffer_byte <= 0:
             return self.MultiRentalManager(dict(), self)
 
-        sms = [self.secure_worker(buffer_byte) for _ in range(rental_size)]
+        sms = list()
+        for _ in range(rental_size):
+            try:
+                sm = self._add_worker_safe(buffer_byte)
+            except Full:
+                for _sm in sms:
+                    self.restore(_sm.name)
+                raise
+            else:
+                sms.append(sm)
+
         return self.MultiRentalManager(
             sms={sm.name: sm for sm in sms},
             smq=self,
