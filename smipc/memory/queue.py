@@ -180,18 +180,15 @@ class SharedMemoryQueue:
         if rental_size <= 0 or buffer_byte <= 0:
             return self.MultiRentalManager(dict(), self)
 
-        sms = list()
+        sms = dict()
         for _ in range(rental_size):
             try:
                 sm = self._add_worker_safe(buffer_byte)
             except Full:
-                for _sm in sms:
-                    self.restore(_sm.name)
+                for sm_name in sms.keys():
+                    self.restore(sm_name)
                 raise
             else:
-                sms.append(sm)
+                sms[sm.name] = sm
 
-        return self.MultiRentalManager(
-            sms={sm.name: sm for sm in sms},
-            smq=self,
-        )
+        return self.MultiRentalManager(sms=sms, smq=self)
