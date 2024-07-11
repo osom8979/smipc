@@ -3,12 +3,11 @@
 from collections import deque
 from multiprocessing.shared_memory import SharedMemory
 from queue import Full
-from typing import Deque, Dict, Final, NamedTuple, Optional, Union
+from typing import Deque, Dict, NamedTuple, Optional, Union
 from weakref import finalize
 
 from smipc.memory.utils import create_shared_memory, destroy_shared_memory
-
-INFINITY_QUEUE_SIZE: Final[int] = -1
+from smipc.variables import INFINITY_QUEUE_SIZE
 
 
 class Written(NamedTuple):

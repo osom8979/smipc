@@ -3,12 +3,11 @@
 from enum import IntEnum, unique
 from os import PathLike, pathconf
 from struct import Struct
-from typing import Final, NamedTuple, Optional, Union
+from typing import NamedTuple, Optional, Union
 
-from smipc.memory.queue import INFINITY_QUEUE_SIZE, SharedMemoryQueue
+from smipc.memory.queue import SharedMemoryQueue
 from smipc.pipe.duplex import FullDuplexPipe
-
-DEFAULT_PIPE_BUF: Final[int] = 4096
+from smipc.variables import DEFAULT_PIPE_BUF, INFINITY_QUEUE_SIZE
 
 
 def get_atomic_buffer_size(
@@ -17,7 +16,7 @@ def get_atomic_buffer_size(
 ) -> int:
     """Maximum number of bytes guaranteed to be atomic when written to a pipe."""
     try:
-        return pathconf(path, "PC_PIPE_BUF")
+        return pathconf(path, "PC_PIPE_BUF")  # Availability: Unix.
     except:  # noqa
         return default
 
@@ -42,7 +41,7 @@ class HeaderPacket(NamedTuple):
     sm_data_size: int
 
 
-class SmipcConnector:
+class SmipcProtocol:
     def __init__(
         self,
         reader_path: Union[str, PathLike[str]],
@@ -71,8 +70,8 @@ class SmipcConnector:
         return self._header.size
 
     def close(self) -> None:
-        self._sms.clear()
         self._pipe.close()
+        self._sms.clear()
 
     def header_pack(self, op: Opcode, pipe_data_size: int, sm_data_size=0) -> bytes:
         return self._header.pack(op, 0x00, pipe_data_size, sm_data_size)

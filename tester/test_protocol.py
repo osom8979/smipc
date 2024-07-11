@@ -5,11 +5,12 @@ from asyncio import gather, to_thread
 from tempfile import TemporaryDirectory
 from unittest import IsolatedAsyncioTestCase, main
 
-from smipc.connector import INFINITY_QUEUE_SIZE, SmipcConnector
 from smipc.pipe.temp import TemporaryPipe
+from smipc.protocol import SmipcProtocol
+from smipc.variables import INFINITY_QUEUE_SIZE
 
 
-class ConnectorTestCase(IsolatedAsyncioTestCase):
+class ProtocolTestCase(IsolatedAsyncioTestCase):
     async def test_default(self):
         with TemporaryDirectory() as tmpdir:
             self.assertTrue(os.path.isdir(tmpdir))
@@ -26,11 +27,11 @@ class ConnectorTestCase(IsolatedAsyncioTestCase):
 
             max_queue = INFINITY_QUEUE_SIZE
             server, client = await gather(
-                to_thread(SmipcConnector, s2c_path, c2s_path, max_queue, None, "utf-8"),
-                to_thread(SmipcConnector, c2s_path, s2c_path, max_queue, None, "utf-8"),
+                to_thread(SmipcProtocol, s2c_path, c2s_path, max_queue, None, "utf-8"),
+                to_thread(SmipcProtocol, c2s_path, s2c_path, max_queue, None, "utf-8"),
             )
-            self.assertIsInstance(server, SmipcConnector)
-            self.assertIsInstance(client, SmipcConnector)
+            self.assertIsInstance(server, SmipcProtocol)
+            self.assertIsInstance(client, SmipcProtocol)
 
             data = b"RGB" * 3840 * 2160  # 4K RGB Image
             self.assertEqual(3840 * 2160 * 3, len(data))
