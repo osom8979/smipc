@@ -7,7 +7,7 @@ from typing import NamedTuple, Optional, Union
 
 from smipc.memory.queue import SharedMemoryQueue
 from smipc.pipe.duplex import FullDuplexPipe
-from smipc.variables import DEFAULT_PIPE_BUF, INFINITY_QUEUE_SIZE
+from smipc.variables import DEFAULT_ENCODING, DEFAULT_PIPE_BUF, INFINITY_QUEUE_SIZE
 
 
 def get_atomic_buffer_size(
@@ -48,7 +48,7 @@ class SmipcProtocol:
         writer_path: Union[str, PathLike[str]],
         max_queue=INFINITY_QUEUE_SIZE,
         open_timeout: Optional[float] = None,
-        encoding="utf-8",
+        encoding=DEFAULT_ENCODING,
     ):
         self._sms = SharedMemoryQueue(max_queue)
         self._pipe = FullDuplexPipe(writer_path, reader_path, open_timeout)

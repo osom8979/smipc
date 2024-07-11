@@ -7,7 +7,6 @@ from unittest import IsolatedAsyncioTestCase, main
 
 from smipc.pipe.temp import TemporaryPipe
 from smipc.protocol import SmipcProtocol
-from smipc.variables import INFINITY_QUEUE_SIZE
 
 
 class ProtocolTestCase(IsolatedAsyncioTestCase):
@@ -25,10 +24,9 @@ class ProtocolTestCase(IsolatedAsyncioTestCase):
             self.assertTrue(os.path.exists(s2c_path))
             self.assertTrue(os.path.exists(c2s_path))
 
-            max_queue = INFINITY_QUEUE_SIZE
             server, client = await gather(
-                to_thread(SmipcProtocol, s2c_path, c2s_path, max_queue, None, "utf-8"),
-                to_thread(SmipcProtocol, c2s_path, s2c_path, max_queue, None, "utf-8"),
+                to_thread(lambda: SmipcProtocol(s2c_path, c2s_path)),
+                to_thread(lambda: SmipcProtocol(c2s_path, s2c_path)),
             )
             self.assertIsInstance(server, SmipcProtocol)
             self.assertIsInstance(client, SmipcProtocol)

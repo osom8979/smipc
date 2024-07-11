@@ -4,7 +4,13 @@ import os
 from typing import Dict, Optional
 
 from smipc.publisher import SmipcPublisher
-from smipc.variables import INFINITY_QUEUE_SIZE, PUB2SUB_SUFFIX, SUB2PUB_SUFFIX
+from smipc.variables import (
+    DEFAULT_ENCODING,
+    DEFAULT_FILE_MODE,
+    INFINITY_QUEUE_SIZE,
+    PUB2SUB_SUFFIX,
+    SUB2PUB_SUFFIX,
+)
 
 
 class SmipcServer:
@@ -15,9 +21,8 @@ class SmipcServer:
         root: str,
         max_queue=INFINITY_QUEUE_SIZE,
         open_timeout: Optional[float] = None,
-        encoding="utf-8",
-        *,
-        mode=0o666,
+        encoding=DEFAULT_ENCODING,
+        mode=DEFAULT_FILE_MODE,
         p2s_suffix=PUB2SUB_SUFFIX,
         s2p_suffix=SUB2PUB_SUFFIX,
     ):

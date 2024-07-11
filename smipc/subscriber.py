@@ -4,7 +4,12 @@ import os
 from typing import Optional
 
 from smipc.protocol import SmipcProtocol
-from smipc.variables import INFINITY_QUEUE_SIZE, PUB2SUB_SUFFIX, SUB2PUB_SUFFIX
+from smipc.variables import (
+    DEFAULT_ENCODING,
+    INFINITY_QUEUE_SIZE,
+    PUB2SUB_SUFFIX,
+    SUB2PUB_SUFFIX,
+)
 
 
 class SmipcSubscriber:
@@ -13,8 +18,7 @@ class SmipcSubscriber:
         prefix: str,
         max_queue=INFINITY_QUEUE_SIZE,
         open_timeout: Optional[float] = None,
-        encoding="utf-8",
-        *,
+        encoding=DEFAULT_ENCODING,
         p2s_suffix=PUB2SUB_SUFFIX,
         s2p_suffix=SUB2PUB_SUFFIX,
     ):

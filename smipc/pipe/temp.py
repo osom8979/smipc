@@ -6,6 +6,8 @@ from os import PathLike
 from typing import Union
 from weakref import finalize
 
+from smipc.variables import DEFAULT_FILE_MODE
+
 
 class TemporaryPipe:
     _file: BufferedWriter
@@ -13,7 +15,7 @@ class TemporaryPipe:
     def __init__(
         self,
         path: Union[str, bytes, PathLike[str], PathLike[bytes]],
-        mode=0o666,
+        mode=DEFAULT_FILE_MODE,
     ):
         os.mkfifo(path, mode)
         self._path = path
