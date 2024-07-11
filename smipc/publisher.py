@@ -17,22 +17,22 @@ class SmipcPublisher:
         encoding="utf-8",
         *,
         mode=0o666,
-        s2p_suffix=SUB2PUB_SUFFIX,
         p2s_suffix=PUB2SUB_SUFFIX,
+        s2p_suffix=SUB2PUB_SUFFIX,
     ):
-        s2p_path = prefix + s2p_suffix
         p2s_path = prefix + p2s_suffix
+        s2p_path = prefix + s2p_suffix
 
-        if os.path.exists(s2p_path):
-            raise FileExistsError(f"s2p file already exists: '{s2p_path}'")
         if os.path.exists(p2s_path):
             raise FileExistsError(f"p2s file already exists: '{p2s_path}'")
+        if os.path.exists(s2p_path):
+            raise FileExistsError(f"s2p file already exists: '{s2p_path}'")
 
-        self._p2s = TemporaryPipe(prefix + p2s_suffix, mode=mode)
-        self._s2p = TemporaryPipe(prefix + s2p_suffix, mode=mode)
+        self._p2s = TemporaryPipe(p2s_path, mode=mode)
+        self._s2p = TemporaryPipe(s2p_path, mode=mode)
 
-        assert p2s_path == self._p2s.path
-        assert s2p_path == self._s2p.path
+        assert self._p2s.path == p2s_path
+        assert self._s2p.path == s2p_path
         assert os.path.exists(self._p2s.path)
         assert os.path.exists(self._s2p.path)
 
@@ -46,6 +46,8 @@ class SmipcPublisher:
 
     def close(self):
         self._proto.close()
+
+    def cleanup(self):
         self._p2s.cleanup()
         self._s2p.cleanup()
 

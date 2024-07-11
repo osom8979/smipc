@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import os
 from io import BufferedWriter
-from os import PathLike, mkfifo, pathconf, remove
+from os import PathLike
 from typing import Union
 from weakref import finalize
 
@@ -14,21 +15,18 @@ class TemporaryPipe:
         path: Union[str, bytes, PathLike[str], PathLike[bytes]],
         mode=0o666,
     ):
-        mkfifo(path, mode)
+        os.mkfifo(path, mode)
         self._path = path
         self._finalizer = finalize(self, self._cleanup, path)
 
     @staticmethod
     def _cleanup(path: Union[str, bytes, PathLike[str], PathLike[bytes]]) -> None:
-        remove(path)
+        if os.path.exists(path):
+            os.remove(path)
 
     @property
     def path(self):
         return self._path
-
-    @property
-    def pipe_buffer_size(self):
-        return pathconf(self._path, "PC_PIPE_BUF")
 
     def cleanup(self):
         if self._finalizer.detach():

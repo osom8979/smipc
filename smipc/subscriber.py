@@ -27,8 +27,8 @@ class SmipcSubscriber:
             raise FileNotFoundError(f"s2p file does not exist: '{s2p_path}'")
 
         self._proto = SmipcProtocol(
-            reader_path=prefix + p2s_suffix,
-            writer_path=prefix + s2p_suffix,
+            reader_path=p2s_path,
+            writer_path=s2p_path,
             max_queue=max_queue,
             open_timeout=open_timeout,
             encoding=encoding,

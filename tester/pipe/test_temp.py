@@ -20,7 +20,6 @@ class TempTestCase(TestCase):
                 self.assertEqual(pipe_path, file_path)
                 self.assertTrue(os.path.exists(pipe_path))
                 self.assertTrue(os.path.exists(file_path))
-                self.assertLessEqual(4096, pipe.pipe_buffer_size)
 
             self.assertFalse(os.path.exists(file_path))
 
