@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from enum import IntEnum, unique
-from warnings import warn
-from dataclasses import dataclass
 from os import PathLike, pathconf
 from struct import Struct
-from typing import Final, List, NamedTuple, Optional, Union
+from typing import Final, NamedTuple, Optional, Union
 
 from smipc.memory.queue import INFINITY_QUEUE_SIZE, SharedMemoryQueue
 from smipc.pipe.duplex import FullDuplexPipe
@@ -13,12 +11,15 @@ from smipc.pipe.duplex import FullDuplexPipe
 DEFAULT_PIPE_BUF: Final[int] = 4096
 
 
-def get_atomic_buffer_size(path: Union[str, PathLike[str]]) -> int:
+def get_atomic_buffer_size(
+    path: Union[str, PathLike[str]],
+    default=DEFAULT_PIPE_BUF,
+) -> int:
     """Maximum number of bytes guaranteed to be atomic when written to a pipe."""
     try:
         return pathconf(path, "PC_PIPE_BUF")
     except:  # noqa
-        return DEFAULT_PIPE_BUF
+        return default
 
 
 @unique
@@ -28,6 +29,12 @@ class Opcode(IntEnum):
     SM_RESTORE = 2
 
 
+class WrittenInfo(NamedTuple):
+    pipe_byte: int
+    sm_byte: int
+    sm_name: Optional[bytes]
+
+
 class HeaderPacket(NamedTuple):
     opcode: Opcode
     reserve: int
@@ -35,15 +42,7 @@ class HeaderPacket(NamedTuple):
     sm_data_size: int
 
 
-@dataclass
-class ZombieSm:
-    name: str
-    error: BaseException
-
-
 class SmipcConnector:
-    _zombies: List[ZombieSm]
-
     def __init__(
         self,
         reader_path: Union[str, PathLike[str]],
@@ -57,24 +56,23 @@ class SmipcConnector:
         self._encoding = encoding
 
         # noinspection SpellCheckingInspection
-        self._header = Struct("@BBII")
+        self._header = Struct("@BBHI")
         # |..................| ^     | @ = native byte order
         # |..................|  ^    | B = 1 byte unsigned char = opcode
         # |..................|   ^   | B = 1 byte unsigned char = reserve
-        # |..................|    ^  | I = 2 byte unsigned int = pipe name size
+        # |..................|    ^  | H = 2 byte unsigned short = pipe name size
         # |..................|     ^ | I = 4 byte unsigned int = sm buffer size
         assert self._header.size == 8
 
-        self._reader_size = get_atomic_buffer_size(reader_path) - self._header.size
         self._writer_size = get_atomic_buffer_size(writer_path) - self._header.size
-        self._zombies = list()
 
     @property
-    def zombies(self) -> List[ZombieSm]:
-        return self._zombies.copy()
+    def header_size(self) -> int:
+        return self._header.size
 
-    def clear_zombies(self) -> None:
-        self._zombies.clear()
+    def close(self) -> None:
+        self._sms.clear()
+        self._pipe.close()
 
     def header_pack(self, op: Opcode, pipe_data_size: int, sm_data_size=0) -> bytes:
         return self._header.pack(op, 0x00, pipe_data_size, sm_data_size)
@@ -98,59 +96,71 @@ class SmipcConnector:
             sm_data_size=sm_data_size,
         )
 
-    def _send_restore(self, sm_name: str) -> int:
-        name = sm_name.encode(encoding=self._encoding)
-        header = self.header_pack(Opcode.SM_RESTORE, len(name))
-        return self._pipe.write(header + name)
-
-    def _send_pipe_direct(self, data: bytes) -> int:
+    def _send_pipe_direct(self, data: bytes) -> WrittenInfo:
         header = self.header_pack(Opcode.PIPE_DIRECT, len(data))
-        return self._pipe.write(header + data)
+        assert len(header) == self._header.size
+        pipe_byte = self._pipe.write(header + data)
+        self._pipe.flush()
+        return WrittenInfo(pipe_byte, 0, None)
 
-    def _send_sm_over_pipe(self, data: bytes) -> int:
+    def _send_sm_over_pipe(self, data: bytes) -> WrittenInfo:
         written = self._sms.write(data)
         name = written.name.encode(encoding=self._encoding)
         header = self.header_pack(Opcode.SM_OVER_PIPE, len(name), len(data))
-        return self._pipe.write(header + name)
+        assert len(header) == self._header.size
+        pipe_byte1 = self._pipe.write(header)
+        pipe_byte2 = self._pipe.write(name)
+        self._pipe.flush()
+        sm_byte = written.size
+        return WrittenInfo(pipe_byte1 + pipe_byte2, sm_byte, name)
 
-    def send(self, data: bytes) -> int:
+    def _send_sm_restore(self, sm_name: bytes) -> WrittenInfo:
+        header = self.header_pack(Opcode.SM_RESTORE, len(sm_name))
+        assert len(header) == self._header.size
+        pipe_byte1 = self._pipe.write(header)
+        pipe_byte2 = self._pipe.write(sm_name)
+        self._pipe.flush()
+        return WrittenInfo(pipe_byte1 + pipe_byte2, 0, None)
+
+    def send(self, data: bytes) -> WrittenInfo:
         if len(data) <= self._writer_size:
             return self._send_pipe_direct(data)
         else:
             return self._send_sm_over_pipe(data)
 
+    def _recv_pipe_direct(self, header: HeaderPacket) -> bytes:
+        assert header.pipe_data_size >= 1
+        assert header.sm_data_size == 0
+        return self._pipe.read(header.pipe_data_size)
+
+    def _recv_sm_over_pipe(self, header: HeaderPacket) -> bytes:
+        assert header.pipe_data_size >= 1
+        assert header.sm_data_size >= 1
+        sm_name = self._pipe.read(header.pipe_data_size)
+        name = str(sm_name, encoding=self._encoding)
+        result = SharedMemoryQueue.read(name, size=header.sm_data_size)
+        assert len(result) == header.sm_data_size
+        restore_result = self._send_sm_restore(sm_name)
+        assert restore_result.pipe_byte == self._header.size + len(sm_name)
+        assert restore_result.sm_byte == 0
+        assert restore_result.sm_name is None
+        return result
+
+    def _recv_sm_restore(self, header: HeaderPacket) -> None:
+        assert header.pipe_data_size >= 1
+        assert header.sm_data_size == 0
+        name = str(self._pipe.read(header.pipe_data_size), encoding=self._encoding)
+        self._sms.restore(name)
+
     def recv(self) -> Optional[bytes]:
         header_data = self._pipe.read(self._header.size)
         header = self.header_unpack(header_data)
-
         if header.opcode == Opcode.PIPE_DIRECT:
-            assert header.pipe_data_size >= 1
-            assert header.sm_data_size == 0
-            return self._pipe.read(header.pipe_data_size)
-
+            return self._recv_pipe_direct(header)
         elif header.opcode == Opcode.SM_OVER_PIPE:
-            assert header.pipe_data_size >= 1
-            assert header.sm_data_size >= 1
-            name = str(self._pipe.read(header.pipe_data_size), encoding=self._encoding)
-            result = SharedMemoryQueue.read(name, size=header.sm_data_size)
-            assert len(result) == header.sm_data_size
-            try:
-                self._send_restore(name)
-            except BaseException as e:
-                warn(
-                    f"Shared Memory that could not be returned occurred: '{e}'",
-                    ResourceWarning,
-                )
-                self._zombies.append(ZombieSm(name, e))
-            finally:
-                return result
-
+            return self._recv_sm_over_pipe(header)
         elif header.opcode == Opcode.SM_RESTORE:
-            assert header.pipe_data_size >= 1
-            assert header.sm_data_size == 0
-            name = str(self._pipe.read(header.pipe_data_size), encoding=self._encoding)
-            self._sms.restore(name)
+            self._recv_sm_restore(header)
             return None
-
         else:
             raise ValueError(f"Unsupported opcode: {header.opcode}")

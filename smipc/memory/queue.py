@@ -180,7 +180,7 @@ class SharedMemoryQueue:
         if rental_size <= 0 or buffer_byte <= 0:
             return self.MultiRentalManager(dict(), self)
 
-        sms = dict()
+        sms = Dict[str, SharedMemory]()
         for _ in range(rental_size):
             try:
                 sm = self._add_worker_safe(buffer_byte)
