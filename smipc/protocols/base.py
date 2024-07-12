@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from abc import ABC, abstractmethod
-from enum import IntEnum, unique
 from os import PathLike, pathconf
-from struct import Struct
 from typing import NamedTuple, Optional, Union
 
 from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
+from smipc.protocols.header import Header, HeaderPacket, Opcode
 from smipc.sm.queue import SmWritten
 from smipc.variables import DEFAULT_ENCODING, DEFAULT_PIPE_BUF
 
@@ -23,24 +22,10 @@ def get_atomic_buffer_size(
         return default
 
 
-@unique
-class Opcode(IntEnum):
-    PIPE_DIRECT = 0
-    SM_OVER_PIPE = 1
-    SM_RESTORE = 2
-
-
 class WrittenInfo(NamedTuple):
     pipe_byte: int
     sm_byte: int
     sm_name: Optional[bytes]
-
-
-class HeaderPacket(NamedTuple):
-    opcode: Opcode
-    reserve: int
-    pipe_data_size: int
-    sm_data_size: int
 
 
 class ProtocolInterface(ABC):
@@ -71,16 +56,7 @@ class BaseProtocol(ProtocolInterface):
     ):
         self._pipe = FullDuplexPipe(writer_path, reader_path, open_timeout)
         self._encoding = encoding
-
-        # noinspection SpellCheckingInspection
-        self._header = Struct("@BBHI")
-        # |..................| ^     | @ = native byte order
-        # |..................|  ^    | B = 1 byte unsigned char = opcode
-        # |..................|   ^   | B = 1 byte unsigned char = reserve
-        # |..................|    ^  | H = 2 byte unsigned short = pipe name size
-        # |..................|     ^ | I = 4 byte unsigned int = sm buffer size
-        assert self._header.size == 8
-
+        self._header = Header()
         self._writer_size = get_atomic_buffer_size(writer_path) - self._header.size
 
     @property
@@ -111,30 +87,8 @@ class BaseProtocol(ProtocolInterface):
         self._pipe.close()
         self.close_sm()
 
-    def encode_header(self, op: Opcode, pipe_data_size: int, sm_data_size=0) -> bytes:
-        return self._header.pack(op, 0x00, pipe_data_size, sm_data_size)
-
-    def decode_header(self, data: bytes) -> HeaderPacket:
-        header = self._header.unpack(data)
-        assert isinstance(header, tuple)
-        assert len(header) == 4
-        opcode = header[0]
-        reserve = header[1]
-        pipe_data_size = header[2]
-        sm_data_size = header[3]
-        assert isinstance(opcode, int)
-        assert isinstance(reserve, int)
-        assert isinstance(pipe_data_size, int)
-        assert isinstance(sm_data_size, int)
-        return HeaderPacket(
-            opcode=Opcode(opcode),
-            reserve=reserve,
-            pipe_data_size=pipe_data_size,
-            sm_data_size=sm_data_size,
-        )
-
     def send_pipe_direct(self, data: bytes) -> WrittenInfo:
-        header = self.encode_header(Opcode.PIPE_DIRECT, len(data))
+        header = self._header.encode(Opcode.PIPE_DIRECT, len(data))
         assert len(header) == self._header.size
         pipe_byte = self._pipe.write(header + data)
         self._pipe.flush()
@@ -143,7 +97,7 @@ class BaseProtocol(ProtocolInterface):
     def send_sm_over_pipe(self, data: bytes) -> WrittenInfo:
         written = self.write_sm(data)
         name = written.encode_name(encoding=self._encoding)
-        header = self.encode_header(Opcode.SM_OVER_PIPE, len(name), len(data))
+        header = self._header.encode(Opcode.SM_OVER_PIPE, len(name), len(data))
         assert len(header) == self._header.size
         pipe_byte1 = self._pipe.write(header)
         pipe_byte2 = self._pipe.write(name)
@@ -152,7 +106,7 @@ class BaseProtocol(ProtocolInterface):
         return WrittenInfo(pipe_byte1 + pipe_byte2, sm_byte, name)
 
     def send_sm_restore(self, sm_name: bytes) -> WrittenInfo:
-        header = self.encode_header(Opcode.SM_RESTORE, len(sm_name))
+        header = self._header.encode(Opcode.SM_RESTORE, len(sm_name))
         assert len(header) == self._header.size
         pipe_byte1 = self._pipe.write(header)
         pipe_byte2 = self._pipe.write(sm_name)
@@ -190,7 +144,7 @@ class BaseProtocol(ProtocolInterface):
 
     def recv(self) -> Optional[bytes]:
         header_data = self._pipe.read(self._header.size)
-        header = self.decode_header(header_data)
+        header = self._header.decode(header_data)
         if header.opcode == Opcode.PIPE_DIRECT:
             return self.recv_pipe_direct(header)
         elif header.opcode == Opcode.SM_OVER_PIPE:
