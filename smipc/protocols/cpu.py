@@ -31,6 +31,11 @@ class CpuProtocol(BaseProtocol):
         self._sms.clear()
 
     @override
+    def read_sm(self, name: bytes, size: int) -> bytes:
+        sm_name = str(name, encoding=self._encoding)
+        return SharedMemoryQueue.read(sm_name, size=size)
+
+    @override
     def write_sm(self, data: bytes) -> SmWritten:
         return self._sms.write(data)
 

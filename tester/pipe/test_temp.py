@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+from gc import collect
 from tempfile import TemporaryDirectory
 from unittest import TestCase, main
 
@@ -14,6 +15,7 @@ class TempTestCase(TestCase):
 
             file_path = os.path.join(tmpdir, "temp.fifo")
             self.assertFalse(os.path.exists(file_path))
+
             pipe = TemporaryPipe(file_path)
 
             with pipe as pipe_path:
@@ -21,6 +23,30 @@ class TempTestCase(TestCase):
                 self.assertTrue(os.path.exists(pipe_path))
                 self.assertTrue(os.path.exists(file_path))
 
+            self.assertFalse(os.path.exists(file_path))
+
+        self.assertFalse(os.path.isdir(tmpdir))
+        self.assertFalse(os.path.exists(tmpdir))
+
+    def test_finalizer(self):
+        with TemporaryDirectory() as tmpdir:
+            self.assertTrue(os.path.isdir(tmpdir))
+
+            file_path = os.path.join(tmpdir, "temp.fifo")
+            self.assertFalse(os.path.exists(file_path))
+
+            pipe = TemporaryPipe(file_path)
+            finalizer = pipe._finalizer
+
+            self.assertTrue(os.path.exists(file_path))
+            self.assertTrue(finalizer.alive)
+
+            # -------
+            del pipe
+            collect()
+            # -------
+
+            self.assertFalse(finalizer.alive)
             self.assertFalse(os.path.exists(file_path))
 
         self.assertFalse(os.path.isdir(tmpdir))

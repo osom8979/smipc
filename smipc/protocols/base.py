@@ -8,7 +8,7 @@ from typing import NamedTuple, Optional, Union
 
 from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
-from smipc.sm.queue import SharedMemoryQueue, SmWritten
+from smipc.sm.queue import SmWritten
 from smipc.variables import DEFAULT_ENCODING, DEFAULT_PIPE_BUF
 
 
@@ -46,6 +46,10 @@ class HeaderPacket(NamedTuple):
 class ProtocolInterface(ABC):
     @abstractmethod
     def close_sm(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def read_sm(self, name: bytes, size: int) -> bytes:
         raise NotImplementedError
 
     @abstractmethod
@@ -89,6 +93,10 @@ class BaseProtocol(ProtocolInterface):
 
     @override
     def close_sm(self) -> None:
+        raise NotImplementedError
+
+    @override
+    def read_sm(self, name: bytes, size: int) -> bytes:
         raise NotImplementedError
 
     @override
@@ -166,8 +174,7 @@ class BaseProtocol(ProtocolInterface):
         assert header.pipe_data_size >= 1
         assert header.sm_data_size >= 1
         sm_name = self._pipe.read(header.pipe_data_size)
-        name = str(sm_name, encoding=self._encoding)
-        result = SharedMemoryQueue.read(name, size=header.sm_data_size)
+        result = self.read_sm(sm_name, header.sm_data_size)
         assert len(result) == header.sm_data_size
         restore_result = self.send_sm_restore(sm_name)
         assert restore_result.pipe_byte == self._header.size + len(sm_name)
