@@ -3,21 +3,12 @@
 import os
 from asyncio import gather, to_thread
 from tempfile import TemporaryDirectory
-from time import sleep, time
-from typing import Optional
 from unittest import IsolatedAsyncioTestCase, main
 
+from smipc.pipe.wait import wait_exists
 from smipc.pubsub.publisher import Publisher
 from smipc.pubsub.subscriber import Subscriber
 from smipc.variables import PUB2SUB_SUFFIX, SUB2PUB_SUFFIX
-
-
-def wait_for_file(path: str, timeout: Optional[float] = None, step=0.001) -> None:
-    begin = time()
-    while not os.path.exists(path):
-        if timeout is not None and (time() - begin) > timeout:
-            raise TimeoutError
-        sleep(step)
 
 
 class PubsubTestCase(IsolatedAsyncioTestCase):
@@ -34,8 +25,9 @@ class PubsubTestCase(IsolatedAsyncioTestCase):
         )
 
     def create_subscriber(self, prefix: str):
-        wait_for_file(prefix + self.p2s_suffix, self.wait_timeout)
-        wait_for_file(prefix + self.s2p_suffix, self.wait_timeout)
+        wait_exists(prefix + self.p2s_suffix, self.wait_timeout)
+        wait_exists(prefix + self.s2p_suffix, self.wait_timeout)
+
         return Subscriber(
             prefix,
             p2s_suffix=self.p2s_suffix,
