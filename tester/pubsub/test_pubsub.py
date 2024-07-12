@@ -7,8 +7,8 @@ from time import sleep, time
 from typing import Optional
 from unittest import IsolatedAsyncioTestCase, main
 
-from smipc.publisher import SmipcPublisher
-from smipc.subscriber import SmipcSubscriber
+from smipc.pubsub.publisher import Publisher
+from smipc.pubsub.subscriber import Subscriber
 from smipc.variables import PUB2SUB_SUFFIX, SUB2PUB_SUFFIX
 
 
@@ -27,7 +27,7 @@ class PubsubTestCase(IsolatedAsyncioTestCase):
         self.wait_timeout = 4.0
 
     def create_publisher(self, prefix: str):
-        return SmipcPublisher(
+        return Publisher(
             prefix,
             p2s_suffix=self.p2s_suffix,
             s2p_suffix=self.s2p_suffix,
@@ -36,7 +36,7 @@ class PubsubTestCase(IsolatedAsyncioTestCase):
     def create_subscriber(self, prefix: str):
         wait_for_file(prefix + self.p2s_suffix, self.wait_timeout)
         wait_for_file(prefix + self.s2p_suffix, self.wait_timeout)
-        return SmipcSubscriber(
+        return Subscriber(
             prefix,
             p2s_suffix=self.p2s_suffix,
             s2p_suffix=self.s2p_suffix,
@@ -51,8 +51,8 @@ class PubsubTestCase(IsolatedAsyncioTestCase):
                 to_thread(self.create_publisher, prefix),
                 to_thread(self.create_subscriber, prefix),
             )
-            self.assertIsInstance(server, SmipcPublisher)
-            self.assertIsInstance(client, SmipcSubscriber)
+            self.assertIsInstance(server, Publisher)
+            self.assertIsInstance(client, Subscriber)
 
             data = b"RGB" * 3840 * 2160  # 4K RGB Image
             self.assertEqual(3840 * 2160 * 3, len(data))

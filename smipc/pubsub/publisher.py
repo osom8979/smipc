@@ -14,7 +14,7 @@ from smipc.variables import (
 )
 
 
-class SmipcPublisher:
+class Publisher:
     def __init__(
         self,
         prefix: str,

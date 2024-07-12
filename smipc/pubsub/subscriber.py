@@ -12,7 +12,7 @@ from smipc.variables import (
 )
 
 
-class SmipcSubscriber:
+class Subscriber:
     def __init__(
         self,
         prefix: str,

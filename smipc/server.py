@@ -3,7 +3,7 @@
 import os
 from typing import Dict, Optional
 
-from smipc.publisher import SmipcPublisher
+from smipc.pubsub.publisher import Publisher
 from smipc.variables import (
     DEFAULT_ENCODING,
     DEFAULT_FILE_MODE,
@@ -14,7 +14,7 @@ from smipc.variables import (
 
 
 class SmipcServer:
-    _pubs: Dict[str, SmipcPublisher]
+    _pubs: Dict[str, Publisher]
 
     def __init__(
         self,
@@ -42,7 +42,7 @@ class SmipcServer:
         if key in self._pubs:
             raise KeyError(f"Already opened publisher: '{key}'")
 
-        self._pubs[key] = SmipcPublisher(
+        self._pubs[key] = Publisher(
             prefix=self.get_prefix(key),
             max_queue=self._max_queue,
             open_timeout=self._open_timeout,
