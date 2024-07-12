@@ -3,7 +3,7 @@
 import os
 from typing import Optional
 
-from smipc.protocol import SmipcProtocol
+from smipc.protocols.cpu import CpuProtocol
 from smipc.variables import (
     DEFAULT_ENCODING,
     INFINITY_QUEUE_SIZE,
@@ -30,12 +30,12 @@ class SmipcSubscriber:
         if not os.path.exists(s2p_path):
             raise FileNotFoundError(f"s2p file does not exist: '{s2p_path}'")
 
-        self._proto = SmipcProtocol(
+        self._proto = CpuProtocol(
             reader_path=p2s_path,
             writer_path=s2p_path,
-            max_queue=max_queue,
             open_timeout=open_timeout,
             encoding=encoding,
+            max_queue=max_queue,
         )
 
     def close(self):

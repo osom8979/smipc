@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-from io import BufferedWriter
 from os import PathLike
 from typing import Union
 from weakref import finalize
@@ -10,8 +9,6 @@ from smipc.variables import DEFAULT_FILE_MODE
 
 
 class TemporaryPipe:
-    _file: BufferedWriter
-
     def __init__(
         self,
         path: Union[str, bytes, PathLike[str], PathLike[bytes]],

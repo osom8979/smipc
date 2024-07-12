@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from smipc.pipe.temp import TemporaryPipe
-from smipc.protocol import SmipcProtocol
+from smipc.protocols.cpu import CpuProtocol
 from smipc.variables import (
     DEFAULT_ENCODING,
     DEFAULT_FILE_MODE,
@@ -18,12 +18,12 @@ class SmipcPublisher:
     def __init__(
         self,
         prefix: str,
-        max_queue=INFINITY_QUEUE_SIZE,
         open_timeout: Optional[float] = None,
         encoding=DEFAULT_ENCODING,
-        mode=DEFAULT_FILE_MODE,
+        max_queue=INFINITY_QUEUE_SIZE,
         p2s_suffix=PUB2SUB_SUFFIX,
         s2p_suffix=SUB2PUB_SUFFIX,
+        mode=DEFAULT_FILE_MODE,
     ):
         p2s_path = prefix + p2s_suffix
         s2p_path = prefix + s2p_suffix
@@ -40,12 +40,12 @@ class SmipcPublisher:
         assert os.path.exists(p2s_path)
         assert os.path.exists(s2p_path)
 
-        self._proto = SmipcProtocol(
+        self._proto = CpuProtocol(
             reader_path=s2p_path,
             writer_path=p2s_path,
-            max_queue=max_queue,
             open_timeout=open_timeout,
             encoding=encoding,
+            max_queue=max_queue,
         )
 
     def close(self):

@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from io import BufferedWriter
 from os import PathLike
 from typing import Union
 
 
 class PipeWriter:
-    _file: BufferedWriter
-
     def __init__(self, path: Union[str, bytes, PathLike[str], PathLike[bytes]]):
-        # noinspection PyTypeChecker
         self._file = open(path, mode="wb")
-        assert isinstance(self._file, BufferedWriter)
         assert not self._file.readable()
         assert self._file.writable()
 

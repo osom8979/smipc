@@ -6,18 +6,25 @@ from queue import Full
 from typing import Deque, Dict, NamedTuple, Optional, Union
 from weakref import finalize
 
-from smipc.memory.utils import create_shared_memory, destroy_shared_memory
+from smipc.sm.utils import create_shared_memory, destroy_shared_memory
 from smipc.variables import INFINITY_QUEUE_SIZE
 
 
-class Written(NamedTuple):
-    name: str
+class SmWritten(NamedTuple):
+    name: Union[str, bytes]
     offset: int
     end: int
 
     @property
     def size(self) -> int:
         return self.end - self.offset
+
+    def encode_name(self, encoding="utf-8") -> bytes:
+        if isinstance(self.name, str):
+            return self.name.encode(encoding=encoding)
+        else:
+            assert isinstance(self.name, bytes)
+            return self.name
 
 
 class SharedMemoryQueue:
@@ -115,13 +122,13 @@ class SharedMemoryQueue:
         self._working[sm.name] = sm
         return sm
 
-    def write_bytes(self, data: bytes, offset=0) -> Written:
+    def write_bytes(self, data: bytes, offset=0) -> SmWritten:
         end = offset + len(data)
         sm = self._add_worker_safe(end)
         sm.buf[offset:end] = data
-        return Written(sm.name, offset, end)
+        return SmWritten(sm.name, offset, end)
 
-    def write(self, data: Union[bytes, memoryview], offset=0) -> Written:
+    def write(self, data: Union[bytes, memoryview], offset=0) -> SmWritten:
         if isinstance(data, memoryview):
             return self.write(data.tobytes(), offset)
         else:

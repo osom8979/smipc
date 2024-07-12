@@ -6,10 +6,10 @@ from tempfile import TemporaryDirectory
 from unittest import IsolatedAsyncioTestCase, main
 
 from smipc.pipe.temp import TemporaryPipe
-from smipc.protocol import SmipcProtocol
+from smipc.protocols.cpu import CpuProtocol
 
 
-class ProtocolTestCase(IsolatedAsyncioTestCase):
+class CpuTestCase(IsolatedAsyncioTestCase):
     async def test_default(self):
         with TemporaryDirectory() as tmpdir:
             self.assertTrue(os.path.isdir(tmpdir))
@@ -25,11 +25,11 @@ class ProtocolTestCase(IsolatedAsyncioTestCase):
             self.assertTrue(os.path.exists(c2s_path))
 
             server, client = await gather(
-                to_thread(lambda: SmipcProtocol(s2c_path, c2s_path)),
-                to_thread(lambda: SmipcProtocol(c2s_path, s2c_path)),
+                to_thread(lambda: CpuProtocol(s2c_path, c2s_path)),
+                to_thread(lambda: CpuProtocol(c2s_path, s2c_path)),
             )
-            self.assertIsInstance(server, SmipcProtocol)
-            self.assertIsInstance(client, SmipcProtocol)
+            self.assertIsInstance(server, CpuProtocol)
+            self.assertIsInstance(client, CpuProtocol)
 
             data = b"RGB" * 3840 * 2160  # 4K RGB Image
             self.assertEqual(3840 * 2160 * 3, len(data))

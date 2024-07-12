@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from typing import NamedTuple
 from uuid import uuid4
 
-from smipc.memory.utils import (
+from smipc.sm.utils import (
     attach_shared_memory,
     create_shared_memory,
     destroy_shared_memory,

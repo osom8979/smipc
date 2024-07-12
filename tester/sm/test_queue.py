@@ -3,7 +3,7 @@
 from multiprocessing.shared_memory import SharedMemory
 from unittest import TestCase, main
 
-from smipc.memory.queue import SharedMemoryQueue
+from smipc.sm.queue import SharedMemoryQueue
 
 
 class SharedMemoryQueueTestCase(TestCase):
