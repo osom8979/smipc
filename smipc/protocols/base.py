@@ -7,7 +7,7 @@ from typing import Generic, NamedTuple, Optional, Sized, TypeVar, Union
 from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
 from smipc.protocols.header import Header, HeaderPacket, Opcode
-from smipc.sm.queue import SmWritten
+from smipc.sm.written import SmWritten
 from smipc.variables import DEFAULT_ENCODING, DEFAULT_PIPE_BUF
 
 

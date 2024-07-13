@@ -3,28 +3,12 @@
 from collections import deque
 from multiprocessing.shared_memory import SharedMemory
 from queue import Full
-from typing import Deque, Dict, NamedTuple, Optional, Union
+from typing import Deque, Dict, Optional, Union
 from weakref import finalize
 
 from smipc.sm.utils import create_shared_memory, destroy_shared_memory
+from smipc.sm.written import SmWritten
 from smipc.variables import INFINITY_QUEUE_SIZE
-
-
-class SmWritten(NamedTuple):
-    name: Union[str, bytes]
-    offset: int
-    end: int
-
-    @property
-    def size(self) -> int:
-        return self.end - self.offset
-
-    def encode_name(self, encoding="utf-8") -> bytes:
-        if isinstance(self.name, str):
-            return self.name.encode(encoding=encoding)
-        else:
-            assert isinstance(self.name, bytes)
-            return self.name
 
 
 class SharedMemoryQueue:

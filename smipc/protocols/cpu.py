@@ -5,7 +5,8 @@ from typing import Optional, Union
 
 from smipc.decorators.override import override
 from smipc.protocols.base import BaseProtocol
-from smipc.sm.queue import SharedMemoryQueue, SmWritten
+from smipc.sm.queue import SharedMemoryQueue
+from smipc.sm.written import SmWritten
 from smipc.variables import DEFAULT_ENCODING, INFINITY_QUEUE_SIZE
 
 
