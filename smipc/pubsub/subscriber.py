@@ -3,7 +3,7 @@
 import os
 from typing import Optional
 
-from smipc.protocols.cpu import CpuProtocol
+from smipc.protocols.sm import SmProtocol
 from smipc.variables import (
     DEFAULT_ENCODING,
     INFINITY_QUEUE_SIZE,
@@ -30,7 +30,7 @@ class Subscriber:
         if not os.path.exists(s2p_path):
             raise FileNotFoundError(f"s2p file does not exist: '{s2p_path}'")
 
-        self._proto = CpuProtocol(
+        self._proto = SmProtocol(
             reader_path=p2s_path,
             writer_path=s2p_path,
             open_timeout=open_timeout,

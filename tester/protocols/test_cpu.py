@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from unittest import IsolatedAsyncioTestCase, main
 
 from smipc.pipe.temp import TemporaryPipe
-from smipc.protocols.cpu import CpuProtocol
+from smipc.protocols.sm import SmProtocol
 
 
 class CpuTestCase(IsolatedAsyncioTestCase):
@@ -25,11 +25,11 @@ class CpuTestCase(IsolatedAsyncioTestCase):
             self.assertTrue(os.path.exists(c2s_path))
 
             server, client = await gather(
-                to_thread(lambda: CpuProtocol(s2c_path, c2s_path)),
-                to_thread(lambda: CpuProtocol(c2s_path, s2c_path)),
+                to_thread(lambda: SmProtocol(s2c_path, c2s_path)),
+                to_thread(lambda: SmProtocol(c2s_path, s2c_path)),
             )
-            self.assertIsInstance(server, CpuProtocol)
-            self.assertIsInstance(client, CpuProtocol)
+            self.assertIsInstance(server, SmProtocol)
+            self.assertIsInstance(client, SmProtocol)
 
             data = b"RGB" * 3840 * 2160  # 4K RGB Image
             self.assertEqual(3840 * 2160 * 3, len(data))

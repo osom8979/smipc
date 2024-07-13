@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 from os import PathLike
 from pathlib import Path
 from threading import Thread
@@ -22,6 +23,11 @@ class FullDuplexPipe:
         if Path(writer_path) == Path(reader_path):
             raise ValueError("The 'reader_path' and 'writer_path' cannot be the same")
 
+        if not os.path.exists(writer_path):
+            raise FileNotFoundError(f"Writer file does not exist: '{writer_path}'")
+        if not os.path.exists(reader_path):
+            raise FileNotFoundError(f"Reader file does not exist: '{reader_path}'")
+
         def _create_writer() -> None:
             self._writer = PipeWriter(writer_path)
 
@@ -30,8 +36,8 @@ class FullDuplexPipe:
 
         # When opening a FIFO, parallel initialization is required
         # because it is in blocking mode.
-        wt = Thread(target=_create_writer)
-        rt = Thread(target=_create_reader)
+        wt = Thread(target=_create_writer, name=f"WriterOpenThread('{writer_path}')")
+        rt = Thread(target=_create_reader, name=f"ReaderOpenThread('{reader_path}')")
         wt.start()
         rt.start()
         wt.join(timeout=open_timeout)

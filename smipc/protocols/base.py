@@ -2,9 +2,8 @@
 
 from abc import ABC, abstractmethod
 from os import PathLike, pathconf
-from typing import Generic, NamedTuple, Optional, Sized, TypeVar, Union
+from typing import NamedTuple, Optional, Union
 
-from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
 from smipc.protocols.header import Header, HeaderPacket, Opcode
 from smipc.sm.written import SmWritten
@@ -28,20 +27,17 @@ class WrittenInfo(NamedTuple):
     sm_name: Optional[bytes]
 
 
-DataType = TypeVar("DataType")
-
-
-class ProtocolInterface(Generic[DataType], ABC):
+class SmProtocolInterface(ABC):
     @abstractmethod
     def close_sm(self) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def write_sm(self, data: DataType, size: int) -> SmWritten:
+    def write_sm(self, data: bytes) -> SmWritten:
         raise NotImplementedError
 
     @abstractmethod
-    def read_sm(self, name: bytes, size: int) -> DataType:
+    def read_sm(self, name: bytes, size: int) -> bytes:
         raise NotImplementedError
 
     @abstractmethod
@@ -49,7 +45,7 @@ class ProtocolInterface(Generic[DataType], ABC):
         raise NotImplementedError
 
 
-class BaseProtocol(ProtocolInterface[DataType]):
+class BaseProtocol(SmProtocolInterface, ABC):
     def __init__(
         self,
         reader_path: Union[str, PathLike[str]],
@@ -75,40 +71,22 @@ class BaseProtocol(ProtocolInterface[DataType]):
     def encoding(self):
         return self._encoding
 
-    @override
-    def close_sm(self) -> None:
-        pass
-
-    @override
-    def write_sm(self, data: DataType, size: int) -> SmWritten:
-        raise NotImplementedError
-
-    @override
-    def read_sm(self, name: bytes, size: int) -> DataType:
-        raise NotImplementedError
-
-    @override
-    def restore_sm(self, name: bytes) -> None:
-        pass
-
     def close(self) -> None:
         self._pipe.close()
         self.close_sm()
 
-    def send_pipe_direct(self, data: bytes, size: int) -> WrittenInfo:
-        if len(data) != size:
-            raise ValueError(f"'data' must be {size} bytes long")
-        header = self._header.encode(Opcode.PIPE_DIRECT, size)
+    def send_pipe_direct(self, data: bytes) -> WrittenInfo:
+        header = self._header.encode(Opcode.PIPE_DIRECT, len(data))
         assert len(header) == self._header.size
         pipe_byte1 = self._pipe.write(header)
         pipe_byte2 = self._pipe.write(data)
         self._pipe.flush()
         return WrittenInfo(pipe_byte1 + pipe_byte2, 0, None)
 
-    def send_sm_over_pipe(self, data: DataType, size: int) -> WrittenInfo:
-        written = self.write_sm(data, size)
+    def send_sm_over_pipe(self, data: bytes) -> WrittenInfo:
+        written = self.write_sm(data)
         name = written.encode_name(encoding=self._encoding)
-        header = self._header.encode(Opcode.SM_OVER_PIPE, len(name), size)
+        header = self._header.encode(Opcode.SM_OVER_PIPE, len(name), len(data))
         assert len(header) == self._header.size
         pipe_byte1 = self._pipe.write(header)
         pipe_byte2 = self._pipe.write(name)
@@ -124,29 +102,18 @@ class BaseProtocol(ProtocolInterface[DataType]):
         self._pipe.flush()
         return WrittenInfo(pipe_byte1 + pipe_byte2, 0, None)
 
-    def send(self, data: DataType, size: Optional[int] = None) -> WrittenInfo:
-        if size is None:
-            if not isinstance(data, Sized):
-                raise TypeError("'size' must be of type Sized")
-            size = len(data)
-
-        assert isinstance(size, int)
-        if not size >= 0:
-            raise ValueError("'size' must be a positive integer")
-
-        if not self._force_sm_over_pipe and size <= self._writer_size:
-            if not isinstance(data, bytes):
-                raise TypeError("data must be bytes type")
-            return self.send_pipe_direct(data, size)
+    def send(self, data: bytes) -> WrittenInfo:
+        if not self._force_sm_over_pipe and len(data) <= self._writer_size:
+            return self.send_pipe_direct(data)
         else:
-            return self.send_sm_over_pipe(data, size)
+            return self.send_sm_over_pipe(data)
 
     def recv_pipe_direct(self, header: HeaderPacket) -> bytes:
         assert header.pipe_data_size >= 1
         assert header.sm_data_size == 0
         return self._pipe.read(header.pipe_data_size)
 
-    def recv_sm_over_pipe(self, header: HeaderPacket) -> DataType:
+    def recv_sm_over_pipe(self, header: HeaderPacket) -> bytes:
         assert header.pipe_data_size >= 1
         assert header.sm_data_size >= 1
         sm_name = self._pipe.read(header.pipe_data_size)
@@ -166,7 +133,7 @@ class BaseProtocol(ProtocolInterface[DataType]):
         name = self._pipe.read(header.pipe_data_size)
         self.restore_sm(name)
 
-    def recv(self) -> Optional[Union[bytes, DataType]]:
+    def recv(self) -> Optional[bytes]:
         header_data = self._pipe.read(self._header.size)
         header = self._header.decode(header_data)
         if header.opcode == Opcode.PIPE_DIRECT:

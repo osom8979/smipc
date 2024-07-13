@@ -10,7 +10,7 @@ from smipc.sm.written import SmWritten
 from smipc.variables import DEFAULT_ENCODING, INFINITY_QUEUE_SIZE
 
 
-class CpuProtocol(BaseProtocol[bytes]):
+class SmProtocol(BaseProtocol):
     def __init__(
         self,
         reader_path: Union[str, PathLike[str]],
@@ -34,7 +34,7 @@ class CpuProtocol(BaseProtocol[bytes]):
         self._sms.clear()
 
     @override
-    def write_sm(self, data: bytes, size: int) -> SmWritten:
+    def write_sm(self, data: bytes) -> SmWritten:
         return self._sms.write(data)
 
     @override

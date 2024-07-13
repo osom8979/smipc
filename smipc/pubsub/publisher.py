@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from smipc.pipe.temp import TemporaryPipe
-from smipc.protocols.cpu import CpuProtocol
+from smipc.protocols.sm import SmProtocol
 from smipc.variables import (
     DEFAULT_ENCODING,
     DEFAULT_FILE_MODE,
@@ -40,7 +40,7 @@ class Publisher:
         assert os.path.exists(p2s_path)
         assert os.path.exists(s2p_path)
 
-        self._proto = CpuProtocol(
+        self._proto = SmProtocol(
             reader_path=s2p_path,
             writer_path=p2s_path,
             open_timeout=open_timeout,
