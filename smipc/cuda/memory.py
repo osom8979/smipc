@@ -5,6 +5,11 @@ from typing import Optional, Sequence
 
 
 class CudaMemory:
+    device_index: int
+    device_memory_ptr: int
+    device_event_ptr: int
+    memory_size: int
+    stride: int
     shape: Sequence[int]
 
     def __init__(
@@ -13,14 +18,14 @@ class CudaMemory:
         device_memory_ptr: int,
         device_event_ptr: int,
         memory_size: int,
-        stride=0,
+        stride: Optional[int] = None,
         shape: Optional[Sequence[int]] = None,
     ):
         self.device_index = device_index
         self.device_memory_ptr = device_memory_ptr
         self.device_event_ptr = device_event_ptr
         self.memory_size = memory_size
-        self.stride = stride
+        self.stride = stride if stride is not None else 0
         self.shape = tuple(shape if shape is not None else ())
 
     @staticmethod
