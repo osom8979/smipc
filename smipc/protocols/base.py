@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from os import PathLike, pathconf
 from typing import NamedTuple, Optional, Union
 
+from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
 from smipc.protocols.header import Header, HeaderPacket, Opcode
 from smipc.sm.written import SmWritten
@@ -27,7 +28,21 @@ class WrittenInfo(NamedTuple):
     sm_name: Optional[bytes]
 
 
-class SmProtocolInterface(ABC):
+class ProtocolInterface(ABC):
+    @abstractmethod
+    def close(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def send(self, data: bytes) -> WrittenInfo:
+        raise NotImplementedError
+
+    @abstractmethod
+    def recv(self) -> Optional[bytes]:
+        raise NotImplementedError
+
+
+class SmInterface(ABC):
     @abstractmethod
     def close_sm(self) -> None:
         raise NotImplementedError
@@ -45,7 +60,7 @@ class SmProtocolInterface(ABC):
         raise NotImplementedError
 
 
-class BaseProtocol(SmProtocolInterface, ABC):
+class BaseProtocol(ProtocolInterface, SmInterface, ABC):
     def __init__(
         self,
         reader_path: Union[str, PathLike[str]],
@@ -71,6 +86,7 @@ class BaseProtocol(SmProtocolInterface, ABC):
     def encoding(self):
         return self._encoding
 
+    @override
     def close(self) -> None:
         self._pipe.close()
         self.close_sm()
@@ -102,6 +118,7 @@ class BaseProtocol(SmProtocolInterface, ABC):
         self._pipe.flush()
         return WrittenInfo(pipe_byte1 + pipe_byte2, 0, None)
 
+    @override
     def send(self, data: bytes) -> WrittenInfo:
         if not self._force_sm_over_pipe and len(data) <= self._writer_size:
             return self.send_pipe_direct(data)
@@ -133,6 +150,7 @@ class BaseProtocol(SmProtocolInterface, ABC):
         name = self._pipe.read(header.pipe_data_size)
         self.restore_sm(name)
 
+    @override
     def recv(self) -> Optional[bytes]:
         header_data = self._pipe.read(self._header.size)
         header = self._header.decode(header_data)
