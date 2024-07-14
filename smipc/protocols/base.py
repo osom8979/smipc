@@ -34,6 +34,10 @@ class ProtocolInterface(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def cleanup(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     def send(self, data: bytes) -> WrittenInfo:
         raise NotImplementedError
 
@@ -90,6 +94,10 @@ class BaseProtocol(ProtocolInterface, SmInterface, ABC):
     def close(self) -> None:
         self._pipe.close()
         self.close_sm()
+
+    @override
+    def cleanup(self) -> None:
+        pass
 
     def send_pipe_direct(self, data: bytes) -> WrittenInfo:
         header = self._header.encode(Opcode.PIPE_DIRECT, len(data))

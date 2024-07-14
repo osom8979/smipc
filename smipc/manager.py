@@ -13,7 +13,7 @@ from smipc.variables import (
 )
 
 
-class SmipcServer:
+class SmipcManager:
     _pubs: Dict[str, Publisher]
 
     def __init__(

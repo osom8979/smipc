@@ -46,6 +46,11 @@ class FullDuplexPipe:
         assert not self._writer.closed
         assert not self._reader.closed
 
+    @property
+    def closed(self) -> bool:
+        assert self._writer.closed == self._reader.closed
+        return self._writer.closed
+
     def close(self) -> None:
         self._writer.close()
         self._reader.close()

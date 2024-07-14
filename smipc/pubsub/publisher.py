@@ -3,7 +3,9 @@
 import os
 from typing import Optional
 
+from smipc.decorators.override import override
 from smipc.pipe.temp import TemporaryPipe
+from smipc.protocols.base import ProtocolInterface, WrittenInfo
 from smipc.protocols.sm import SmProtocol
 from smipc.variables import (
     DEFAULT_ENCODING,
@@ -14,7 +16,7 @@ from smipc.variables import (
 )
 
 
-class Publisher:
+class Publisher(ProtocolInterface):
     def __init__(
         self,
         prefix: str,
@@ -48,15 +50,19 @@ class Publisher:
             max_queue=max_queue,
         )
 
-    def close(self):
+    @override
+    def close(self) -> None:
         self._proto.close()
 
-    def cleanup(self):
+    @override
+    def cleanup(self) -> None:
         self._p2s.cleanup()
         self._s2p.cleanup()
 
-    def recv(self):
+    @override
+    def recv(self) -> Optional[bytes]:
         return self._proto.recv()
 
-    def send(self, data: bytes):
+    @override
+    def send(self, data: bytes) -> WrittenInfo:
         return self._proto.send(data)
