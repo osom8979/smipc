@@ -42,7 +42,7 @@ class Publisher(ProtocolInterface):
         assert os.path.exists(p2s_path)
         assert os.path.exists(s2p_path)
 
-        self._proto = SmProtocol(
+        self._proto = SmProtocol.from_fifo(
             reader_path=s2p_path,
             writer_path=p2s_path,
             open_timeout=open_timeout,

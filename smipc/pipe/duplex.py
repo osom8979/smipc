@@ -4,7 +4,7 @@ import os
 from os import PathLike
 from pathlib import Path
 from threading import Thread
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from smipc.pipe.reader import PipeReader
 from smipc.pipe.writer import PipeWriter
@@ -14,8 +14,13 @@ class FullDuplexPipe:
     _writer: PipeWriter
     _reader: PipeReader
 
-    def __init__(
-        self,
+    def __init__(self, writer: PipeWriter, reader: PipeReader):
+        self._writer = writer
+        self._reader = reader
+
+    @classmethod
+    def from_fifo(
+        cls,
         writer_path: Union[str, PathLike[str]],
         reader_path: Union[str, PathLike[str]],
         open_timeout: Optional[float] = None,
@@ -28,11 +33,13 @@ class FullDuplexPipe:
         if not os.path.exists(reader_path):
             raise FileNotFoundError(f"Reader file does not exist: '{reader_path}'")
 
+        shared_scope: Dict[str, Any] = dict()
+
         def _create_writer() -> None:
-            self._writer = PipeWriter(writer_path)
+            shared_scope["writer"] = PipeWriter(writer_path)
 
         def _create_reader() -> None:
-            self._reader = PipeReader(reader_path)
+            shared_scope["reader"] = PipeReader(reader_path)
 
         # When opening a FIFO, parallel initialization is required
         # because it is in blocking mode.
@@ -43,13 +50,26 @@ class FullDuplexPipe:
         wt.join(timeout=open_timeout)
         rt.join(timeout=open_timeout)
 
-        assert not self._writer.closed
-        assert not self._reader.closed
+        assert "writer" in shared_scope
+        assert "reader" in shared_scope
+
+        assert not shared_scope["writer"].closed
+        assert not shared_scope["reader"].closed
+
+        return cls(**shared_scope)
 
     @property
     def closed(self) -> bool:
         assert self._writer.closed == self._reader.closed
         return self._writer.closed
+
+    @property
+    def writer(self):
+        return self._writer
+
+    @property
+    def reader(self):
+        return self._reader
 
     def close(self) -> None:
         self._writer.close()

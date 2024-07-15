@@ -1,25 +1,21 @@
 # -*- coding: utf-8 -*-
 
 from abc import ABC, abstractmethod
-from os import PathLike, pathconf
-from typing import NamedTuple, Optional, Union
+from typing import NamedTuple, Optional
 
 from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
+from smipc.pipe.writer import PipeWriter
 from smipc.protocols.header import Header, HeaderPacket, Opcode
 from smipc.sm.written import SmWritten
 from smipc.variables import DEFAULT_ENCODING, DEFAULT_PIPE_BUF
 
 
-def get_atomic_buffer_size(
-    path: Union[str, PathLike[str]],
-    default=DEFAULT_PIPE_BUF,
-) -> int:
-    """Maximum number of bytes guaranteed to be atomic when written to a pipe."""
+def calc_writer_size(writer: PipeWriter, header: Header) -> int:
     try:
-        return pathconf(path, "PC_PIPE_BUF")  # Availability: Unix.
+        return writer.get_pipe_buf() - header.size
     except:  # noqa
-        return default
+        return DEFAULT_PIPE_BUF - header.size
 
 
 class WrittenInfo(NamedTuple):
@@ -67,20 +63,18 @@ class SmInterface(ABC):
 class BaseProtocol(ProtocolInterface, SmInterface, ABC):
     def __init__(
         self,
-        reader_path: Union[str, PathLike[str]],
-        writer_path: Union[str, PathLike[str]],
-        open_timeout: Optional[float] = None,
+        pipe: FullDuplexPipe,
         encoding=DEFAULT_ENCODING,
         *,
         force_sm_over_pipe=False,
         disable_restore_sm=False,
     ):
-        self._pipe = FullDuplexPipe(writer_path, reader_path, open_timeout)
+        self._pipe = pipe
         self._encoding = encoding
         self._header = Header()
-        self._writer_size = get_atomic_buffer_size(writer_path) - self._header.size
         self._force_sm_over_pipe = force_sm_over_pipe
         self._disable_restore_sm = disable_restore_sm
+        self._writer_size = calc_writer_size(self._pipe.writer, self._header)
 
     @property
     def header_size(self):

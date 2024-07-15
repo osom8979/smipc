@@ -25,8 +25,8 @@ class DuplexTestCase(IsolatedAsyncioTestCase):
             self.assertTrue(os.path.exists(c2s_path))
 
             server, client = await gather(
-                to_thread(FullDuplexPipe, s2c_path, c2s_path, None),
-                to_thread(FullDuplexPipe, c2s_path, s2c_path, None),
+                to_thread(FullDuplexPipe.from_fifo, s2c_path, c2s_path, None),
+                to_thread(FullDuplexPipe.from_fifo, c2s_path, s2c_path, None),
             )
             self.assertIsInstance(server, FullDuplexPipe)
             self.assertIsInstance(client, FullDuplexPipe)

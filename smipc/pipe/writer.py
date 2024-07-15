@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from io import BufferedWriter
-from os import PathLike
+from os import PathLike, pathconf
 from typing import Union
 
 
@@ -9,11 +9,16 @@ class PipeWriter:
     _file: BufferedWriter
 
     def __init__(self, path: Union[str, bytes, PathLike[str], PathLike[bytes]]):
+        self._path = path
         # noinspection PyTypeChecker
         self._file = open(path, mode="wb")
         assert isinstance(self._file, BufferedWriter)
         assert not self._file.readable()
         assert self._file.writable()
+
+    @property
+    def path(self):
+        return self._path
 
     @property
     def file(self):
@@ -22,6 +27,10 @@ class PipeWriter:
     @property
     def closed(self):
         return self._file.closed
+
+    def get_pipe_buf(self) -> int:
+        """Maximum number of bytes guaranteed to be atomic when written to a pipe."""
+        return pathconf(self._file.fileno(), "PC_PIPE_BUF")  # Availability: Unix.
 
     def close(self) -> None:
         self._file.close()

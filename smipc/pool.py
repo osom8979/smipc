@@ -3,6 +3,7 @@
 import os
 from typing import Dict, Optional
 
+from smipc.protocols.base import WrittenInfo
 from smipc.pubsub.publisher import Publisher
 from smipc.variables import (
     DEFAULT_ENCODING,
@@ -13,50 +14,62 @@ from smipc.variables import (
 )
 
 
-class SmipcManager:
+class SmipcPool:
     _pubs: Dict[str, Publisher]
 
     def __init__(
         self,
         root: str,
-        max_queue=INFINITY_QUEUE_SIZE,
-        open_timeout: Optional[float] = None,
-        encoding=DEFAULT_ENCODING,
-        mode=DEFAULT_FILE_MODE,
         p2s_suffix=PUB2SUB_SUFFIX,
         s2p_suffix=SUB2PUB_SUFFIX,
     ):
         self._root = root
-        self._max_queue = max_queue
-        self._open_timeout = open_timeout
-        self._encoding = encoding
-        self._mode = mode
         self._p2s_suffix = p2s_suffix
         self._s2p_suffix = s2p_suffix
         self._pubs = dict()
 
+    @property
+    def root(self):
+        return self._root
+
+    def keys(self):
+        return self._pubs.keys()
+
+    def values(self):
+        return self._pubs.values()
+
     def get_prefix(self, key: str) -> str:
         return os.path.join(self._root, key)
 
-    def open(self, key: str) -> None:
+    def open(
+        self,
+        key: str,
+        open_timeout: Optional[float] = None,
+        encoding=DEFAULT_ENCODING,
+        max_queue=INFINITY_QUEUE_SIZE,
+        mode=DEFAULT_FILE_MODE,
+    ) -> None:
         if key in self._pubs:
             raise KeyError(f"Already opened publisher: '{key}'")
 
         self._pubs[key] = Publisher(
             prefix=self.get_prefix(key),
-            max_queue=self._max_queue,
-            open_timeout=self._open_timeout,
-            encoding=self._encoding,
-            mode=self._mode,
-            s2p_suffix=self._s2p_suffix,
+            open_timeout=open_timeout,
+            encoding=encoding,
+            max_queue=max_queue,
             p2s_suffix=self._p2s_suffix,
+            s2p_suffix=self._s2p_suffix,
+            mode=mode,
         )
 
-    def close(self, key: str):
+    def close(self, key: str) -> None:
         self._pubs[key].close()
 
-    def recv(self, key: str):
+    def cleanup(self, key: str) -> None:
+        self._pubs[key].cleanup()
+
+    def recv(self, key: str) -> Optional[bytes]:
         return self._pubs[key].recv()
 
-    def send(self, key: str, data: bytes):
+    def send(self, key: str, data: bytes) -> WrittenInfo:
         return self._pubs[key].send(data)

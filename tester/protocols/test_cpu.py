@@ -25,8 +25,8 @@ class CpuTestCase(IsolatedAsyncioTestCase):
             self.assertTrue(os.path.exists(c2s_path))
 
             server, client = await gather(
-                to_thread(lambda: SmProtocol(s2c_path, c2s_path)),
-                to_thread(lambda: SmProtocol(c2s_path, s2c_path)),
+                to_thread(lambda: SmProtocol.from_fifo(s2c_path, c2s_path)),
+                to_thread(lambda: SmProtocol.from_fifo(c2s_path, s2c_path)),
             )
             self.assertIsInstance(server, SmProtocol)
             self.assertIsInstance(client, SmProtocol)

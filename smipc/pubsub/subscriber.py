@@ -32,7 +32,7 @@ class Subscriber(ProtocolInterface):
         if not os.path.exists(s2p_path):
             raise FileNotFoundError(f"s2p file does not exist: '{s2p_path}'")
 
-        self._proto = SmProtocol(
+        self._proto = SmProtocol.from_fifo(
             reader_path=p2s_path,
             writer_path=s2p_path,
             open_timeout=open_timeout,
