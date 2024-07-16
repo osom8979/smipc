@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from struct import pack, unpack, unpack_from
-from typing import Optional, Sequence
+from typing import Final, Optional, Sequence
+
+LEN_SHAPE_OFFSET: Final[int] = 20
 
 
 class CudaMemory:
@@ -33,12 +35,12 @@ class CudaMemory:
         # noinspection SpellCheckingInspection
         return f"@IIIIII{len_shape}I"
         # |....| ^       | @ = native byte order
-        # |....|  ^      | I = 4 byte unsigned int = device_index
-        # |....|   ^     | I = 4 byte unsigned int = device_memory_ptr
-        # |....|    ^    | I = 4 byte unsigned int = device_event_ptr
-        # |....|     ^   | I = 4 byte unsigned int = memory_size
-        # |....|      ^  | I = 4 byte unsigned int = stride
-        # |....|       ^ | I = 4 byte unsigned int = len(shape)
+        # |....|  ^      | I =  0 ~ 4 byte unsigned int = device_index
+        # |....|   ^     | I =  4 ~ 4 byte unsigned int = device_memory_ptr
+        # |....|    ^    | I =  8 ~ 4 byte unsigned int = device_event_ptr
+        # |....|     ^   | I = 12 ~ 4 byte unsigned int = memory_size
+        # |....|      ^  | I = 16 ~ 4 byte unsigned int = stride
+        # |....|       ^ | I = 20 ~ 4 byte unsigned int = len(shape)
 
     @staticmethod
     def unpack_len_shape(data: bytes) -> int:
@@ -59,7 +61,7 @@ class CudaMemory:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        len_shape = unpack_from("@I", data, 20)[0]
+        len_shape = unpack_from("@I", data, LEN_SHAPE_OFFSET)[0]
         fmt = cls.pack_fmt(len_shape)
 
         props = unpack(fmt, data)
