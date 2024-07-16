@@ -24,9 +24,6 @@ class SimplexTestCase(TestCase):
                 reader = PipeReader(pipe_path)
                 writer = PipeWriter(pipe_path)
 
-                self.assertIsInstance(writer, PipeWriter)
-                self.assertIsInstance(reader, PipeReader)
-
                 data = b"data"
                 self.assertEqual(4, writer.write(data))
                 self.assertEqual(data, reader.read(4))

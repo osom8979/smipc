@@ -18,29 +18,28 @@ class PipeWriter:
         open_blocking=False,
     ):
         if open_blocking:
-            self._file = os.open(path, _BLOCKING_WRITER_FLAGS)
+            self._fd = os.open(path, _BLOCKING_WRITER_FLAGS)
             try:
-                os.set_blocking(self._file, True)
+                os.set_blocking(self._fd, True)
             except:  # noqa
-                os.close(self._file)
+                os.close(self._fd)
                 raise
             else:
-                assert os.get_blocking(self._file)
+                assert os.get_blocking(self._fd)
         else:
-            self._file = os.open(path, _WRITER_FLAGS)
+            self._fd = os.open(path, _WRITER_FLAGS)
 
-    @property
-    def file(self) -> int:
-        return self._file
+    def fileno(self) -> int:
+        return self._fd
 
     def close(self) -> None:
-        os.close(self._file)
+        os.close(self._fd)
 
     def write(self, data: bytes) -> int:
-        return os.write(self._file, data)
+        return os.write(self._fd, data)
 
     def get_pipe_buf(self) -> int:
-        return get_pipe_buf(self._file)
+        return get_pipe_buf(self._fd)
 
     def __enter__(self):
         return self

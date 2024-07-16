@@ -5,6 +5,7 @@ asctime
 aten
 coros
 datefmt
+fileno
 levelname
 meipass
 nocov
