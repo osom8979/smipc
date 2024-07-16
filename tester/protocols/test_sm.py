@@ -9,7 +9,7 @@ from smipc.pipe.temp import TemporaryPipe
 from smipc.protocols.sm import SmProtocol
 
 
-class CpuTestCase(IsolatedAsyncioTestCase):
+class SmTestCase(IsolatedAsyncioTestCase):
     async def test_default(self):
         with TemporaryDirectory() as tmpdir:
             self.assertTrue(os.path.isdir(tmpdir))
