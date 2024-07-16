@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+from threading import Event
 from typing import Optional
 
 from smipc.decorators.override import override
@@ -26,6 +27,9 @@ class Publisher(ProtocolInterface):
         p2s_suffix=PUB2SUB_SUFFIX,
         s2p_suffix=SUB2PUB_SUFFIX,
         mode=DEFAULT_FILE_MODE,
+        *,
+        interval=0.001,
+        blocking: Optional[Event] = None,
     ):
         p2s_path = prefix + p2s_suffix
         s2p_path = prefix + s2p_suffix
@@ -48,6 +52,8 @@ class Publisher(ProtocolInterface):
             open_timeout=open_timeout,
             encoding=encoding,
             max_queue=max_queue,
+            interval=interval,
+            blocking=blocking,
         )
 
     @override

@@ -77,6 +77,10 @@ class BaseProtocol(ProtocolInterface, SmInterface, ABC):
         self._writer_size = calc_writer_size(self._pipe.writer, self._header)
 
     @property
+    def pipe(self):
+        return self._pipe
+
+    @property
     def header_size(self):
         return self._header.size
 

@@ -39,10 +39,18 @@ class DuplexTestCase(IsolatedAsyncioTestCase):
             self.assertEqual(4, client.write(c2s_data))
             self.assertEqual(c2s_data, server.read(4))
 
+            server.close()
+            client.close()
+
             s2c_pipe.cleanup()
             c2s_pipe.cleanup()
             self.assertFalse(os.path.exists(s2c_path))
             self.assertFalse(os.path.exists(c2s_path))
+
+            with self.assertRaises(OSError):
+                server.close()
+            with self.assertRaises(OSError):
+                client.close()
 
 
 if __name__ == "__main__":

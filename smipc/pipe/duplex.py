@@ -4,21 +4,11 @@ import os
 from os import PathLike
 from pathlib import Path
 from threading import Event
-from typing import Optional, TypedDict, Union
+from typing import Optional, Union
 
 from smipc.pipe.reader import PipeReader
 from smipc.pipe.wait import blocking_pipe_writer, wait_pipe_writer
 from smipc.pipe.writer import PipeWriter
-
-
-class InitProps(TypedDict):
-    writer: PipeWriter
-    reader: PipeReader
-
-
-class InitErrors(TypedDict):
-    writer: BaseException
-    reader: BaseException
 
 
 class FullDuplexPipe:

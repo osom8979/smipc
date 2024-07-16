@@ -12,14 +12,6 @@ from smipc.pipe.reader import PipeReader
 from smipc.pipe.writer import PipeWriter
 
 
-class EventFlagIsSetError(Exception):
-    pass
-
-
-class ThreadIsAliveError(Exception):
-    pass
-
-
 def wait_exists(
     path: Union[int, str, bytes, PathLike[str], PathLike[bytes]],
     timeout: Optional[float] = None,
@@ -41,7 +33,7 @@ def wait_exists(
         sleep(interval)
 
     assert event.is_set()
-    raise EventFlagIsSetError
+    raise InterruptedError
 
 
 def wait_pipe_writer(
@@ -68,7 +60,7 @@ def wait_pipe_writer(
         sleep(interval)
 
     assert event.is_set()
-    raise EventFlagIsSetError
+    raise InterruptedError
 
 
 @unique
@@ -98,11 +90,12 @@ class _BlockingPipeWriterResult:
     def set_writer(self, value: PipeWriter) -> None:
         with self._lock:
             self._writer = value
-        self._event.set()
 
     def set_error(self, value: BaseException) -> None:
         with self._lock:
             self._error = value
+
+    def set_event(self) -> None:
         self._event.set()
 
 
@@ -112,9 +105,12 @@ def _blocking_pipe_writer_open(
 ) -> None:
     try:
         writer = PipeWriter(path, open_blocking=True)
-        result.set_writer(writer)
     except BaseException as e:
         result.set_error(e)
+    else:
+        result.set_writer(writer)
+    finally:
+        result.set_event()
 
 
 def blocking_pipe_writer(
@@ -157,7 +153,7 @@ def blocking_pipe_writer(
 
     assert end_reason in (InterruptedError, TimeoutError)
 
-    release_reader = PipeReader(path)
+    fake_reader = PipeReader(path)
     try:
         # To release a blocking thread...
         thread.join(timeout=thread_join_timeout)
@@ -171,6 +167,6 @@ def blocking_pipe_writer(
             assert writer is None
             end_error = error
     finally:
-        release_reader.close()
+        fake_reader.close()
 
     raise end_reason from end_error

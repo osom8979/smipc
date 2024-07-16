@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from os import PathLike
+from threading import Event
 from typing import Optional, Union
 
 from smipc.decorators.override import override
@@ -34,12 +35,18 @@ class SmProtocol(BaseProtocol):
         open_timeout: Optional[float] = None,
         encoding=DEFAULT_ENCODING,
         max_queue=INFINITY_QUEUE_SIZE,
+        *,
+        interval=0.001,
+        blocking: Optional[Event] = None,
     ):
-        return cls(
-            pipe=FullDuplexPipe.from_fifo(writer_path, reader_path, open_timeout),
-            encoding=encoding,
-            max_queue=max_queue,
+        pipe = FullDuplexPipe.from_fifo(
+            writer_path,
+            reader_path,
+            open_timeout,
+            interval=interval,
+            blocking=blocking,
         )
+        return cls(pipe=pipe, encoding=encoding, max_queue=max_queue)
 
     @override
     def close_sm(self) -> None:
