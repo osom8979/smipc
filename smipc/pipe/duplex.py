@@ -3,11 +3,22 @@
 import os
 from os import PathLike
 from pathlib import Path
-from threading import Thread
-from typing import Any, Dict, Optional, Union
+from threading import Event
+from typing import Optional, TypedDict, Union
 
 from smipc.pipe.reader import PipeReader
+from smipc.pipe.wait import blocking_pipe_writer, wait_pipe_writer
 from smipc.pipe.writer import PipeWriter
+
+
+class InitProps(TypedDict):
+    writer: PipeWriter
+    reader: PipeReader
+
+
+class InitErrors(TypedDict):
+    writer: BaseException
+    reader: BaseException
 
 
 class FullDuplexPipe:
@@ -24,7 +35,13 @@ class FullDuplexPipe:
         writer_path: Union[str, PathLike[str]],
         reader_path: Union[str, PathLike[str]],
         open_timeout: Optional[float] = None,
+        *,
+        interval=0.001,
+        blocking: Optional[Event] = None,
     ):
+        if not interval >= 0:
+            raise ValueError("The 'interval' must be a positive float")
+
         if Path(writer_path) == Path(reader_path):
             raise ValueError("The 'reader_path' and 'writer_path' cannot be the same")
 
@@ -33,35 +50,20 @@ class FullDuplexPipe:
         if not os.path.exists(reader_path):
             raise FileNotFoundError(f"Reader file does not exist: '{reader_path}'")
 
-        shared_scope: Dict[str, Any] = dict()
+        # ------------------------------------------------------------
+        # [WARNING] Do not change the calling order.
+        reader = PipeReader(reader_path)
+        try:
+            if blocking is not None:
+                writer = blocking_pipe_writer(writer_path, open_timeout, blocking)
+            else:
+                writer = wait_pipe_writer(writer_path, open_timeout, interval)
+        except:  # noqa
+            reader.close()
+            raise
+        # ------------------------------------------------------------
 
-        def _create_writer() -> None:
-            shared_scope["writer"] = PipeWriter(writer_path)
-
-        def _create_reader() -> None:
-            shared_scope["reader"] = PipeReader(reader_path)
-
-        # When opening a FIFO, parallel initialization is required
-        # because it is in blocking mode.
-        wt = Thread(target=_create_writer, name=f"WriterOpenThread('{writer_path}')")
-        rt = Thread(target=_create_reader, name=f"ReaderOpenThread('{reader_path}')")
-        wt.start()
-        rt.start()
-        wt.join(timeout=open_timeout)
-        rt.join(timeout=open_timeout)
-
-        assert "writer" in shared_scope
-        assert "reader" in shared_scope
-
-        assert not shared_scope["writer"].closed
-        assert not shared_scope["reader"].closed
-
-        return cls(**shared_scope)
-
-    @property
-    def closed(self) -> bool:
-        assert self._writer.closed == self._reader.closed
-        return self._writer.closed
+        return cls(reader=reader, writer=writer)
 
     @property
     def writer(self):
@@ -86,6 +88,3 @@ class FullDuplexPipe:
 
     def write(self, data: bytes) -> int:
         return self._writer.write(data)
-
-    def flush(self) -> None:
-        self._writer.flush()

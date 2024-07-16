@@ -96,29 +96,22 @@ class BaseProtocol(ProtocolInterface, SmInterface, ABC):
     def send_pipe_direct(self, data: bytes) -> WrittenInfo:
         header = self._header.encode(Opcode.PIPE_DIRECT, len(data))
         assert len(header) == self._header.size
-        pipe_byte1 = self._pipe.write(header)
-        pipe_byte2 = self._pipe.write(data)
-        self._pipe.flush()
-        return WrittenInfo(pipe_byte1 + pipe_byte2, 0, None)
+        pipe_byte = self._pipe.write(header + data)
+        return WrittenInfo(pipe_byte, 0, None)
 
     def send_sm_over_pipe(self, data: bytes) -> WrittenInfo:
         written = self.write_sm(data)
         name = written.encode_name(encoding=self._encoding)
         header = self._header.encode(Opcode.SM_OVER_PIPE, len(name), len(data))
         assert len(header) == self._header.size
-        pipe_byte1 = self._pipe.write(header)
-        pipe_byte2 = self._pipe.write(name)
-        self._pipe.flush()
-        sm_byte = written.size
-        return WrittenInfo(pipe_byte1 + pipe_byte2, sm_byte, name)
+        pipe_byte = self._pipe.write(header + name)
+        return WrittenInfo(pipe_byte, written.size, name)
 
     def send_sm_restore(self, sm_name: bytes) -> WrittenInfo:
         header = self._header.encode(Opcode.SM_RESTORE, len(sm_name))
         assert len(header) == self._header.size
-        pipe_byte1 = self._pipe.write(header)
-        pipe_byte2 = self._pipe.write(sm_name)
-        self._pipe.flush()
-        return WrittenInfo(pipe_byte1 + pipe_byte2, 0, None)
+        pipe_byte = self._pipe.write(header + sm_name)
+        return WrittenInfo(pipe_byte, 0, None)
 
     @override
     def send(self, data: bytes) -> WrittenInfo:
