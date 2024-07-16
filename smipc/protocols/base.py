@@ -6,7 +6,7 @@ from typing import NamedTuple, Optional
 from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
 from smipc.pipe.writer import PipeWriter
-from smipc.protocols.header import Header, HeaderPacket, Opcode
+from smipc.protocols.header import EMPTY_HEADER_PACKET, Header, HeaderPacket, Opcode
 from smipc.sm.written import SmWritten
 from smipc.variables import DEFAULT_ENCODING, DEFAULT_PIPE_BUF
 
@@ -97,6 +97,10 @@ class BaseProtocol(ProtocolInterface, SmInterface, ABC):
     def cleanup(self) -> None:
         pass
 
+    def send_empty(self) -> WrittenInfo:
+        pipe_byte = self._pipe.write(EMPTY_HEADER_PACKET)
+        return WrittenInfo(pipe_byte, 0, None)
+
     def send_pipe_direct(self, data: bytes) -> WrittenInfo:
         header = self._header.encode(Opcode.PIPE_DIRECT, len(data))
         assert len(header) == self._header.size
@@ -153,6 +157,8 @@ class BaseProtocol(ProtocolInterface, SmInterface, ABC):
     def recv(self) -> Optional[bytes]:
         header_data = self._pipe.read(self._header.size)
         header = self._header.decode(header_data)
+        if header.opcode == Opcode.EMPTY:
+            return None
         if header.opcode == Opcode.PIPE_DIRECT:
             return self.recv_pipe_direct(header)
         elif header.opcode == Opcode.SM_OVER_PIPE:

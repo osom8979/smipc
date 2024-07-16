@@ -1,8 +1,24 @@
 # -*- coding: utf-8 -*-
 
 from enum import IntEnum, unique
-from struct import Struct, calcsize
+from struct import Struct, calcsize, pack
 from typing import Final, NamedTuple
+
+
+@unique
+class Opcode(IntEnum):
+    EMPTY = 0
+    PIPE_DIRECT = 1
+    SM_OVER_PIPE = 2
+    SM_RESTORE = 3
+
+
+class HeaderPacket(NamedTuple):
+    opcode: Opcode
+    reserve: int
+    pipe_data_size: int
+    sm_data_size: int
+
 
 # noinspection SpellCheckingInspection
 HEADER_FORMAT: Final[str] = "@BBHI"
@@ -13,20 +29,7 @@ HEADER_FORMAT: Final[str] = "@BBHI"
 # |........................|     ^ | I = 4 byte unsigned int = sm buffer size
 
 HEADER_SIZE: Final[int] = calcsize(HEADER_FORMAT)
-
-
-@unique
-class Opcode(IntEnum):
-    PIPE_DIRECT = 0
-    SM_OVER_PIPE = 1
-    SM_RESTORE = 2
-
-
-class HeaderPacket(NamedTuple):
-    opcode: Opcode
-    reserve: int
-    pipe_data_size: int
-    sm_data_size: int
+EMPTY_HEADER_PACKET: Final[bytes] = pack(HEADER_FORMAT, int(Opcode.EMPTY), 0x00, 0, 0)
 
 
 class Header:
