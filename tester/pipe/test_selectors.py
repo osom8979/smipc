@@ -6,7 +6,7 @@ from selectors import EVENT_READ, DefaultSelector
 from tempfile import TemporaryDirectory
 from threading import Event
 from typing import Final
-from unittest import IsolatedAsyncioTestCase, main, skip
+from unittest import IsolatedAsyncioTestCase, main
 
 from smipc.pipe.reader import PipeReader
 from smipc.pipe.temp import TemporaryPipe
@@ -15,28 +15,31 @@ from smipc.pipe.writer import PipeWriter
 TEST_TIMEOUT_SECONDS: Final[float] = 0.3
 
 
-def _read_file(file: PipeReader, size=1) -> bytes:
+def _read_file(file: PipeReader, size: int) -> bytes:
     return file.read(size)
 
 
-def _selector_close(selector: DefaultSelector, event: Event) -> None:
+def _selector_close(path: str, event: Event) -> None:
     event.wait(TEST_TIMEOUT_SECONDS)
-    selector.close()
     event.set()
+
+    fake_writer = PipeWriter(path)
+    try:
+        fake_writer.write(b"\x00")
+    finally:
+        fake_writer.close()
 
 
 def _selector_main(selector: DefaultSelector, result: bytearray, event: Event) -> None:
     while not event.is_set():
-        try:
-            events = selector.select()
-        except BaseException as e:
-            print(e)
-        else:
-            if not events:
-                continue
-            for key, mask in events:
-                callback = key.data
-                result.extend(callback(key.fileobj))
+        events = selector.select()
+        for key, mask in events:
+            callback = key.data
+            data = callback(key.fileobj, 1)
+            if data == b"\x00":
+                break
+            else:
+                result.extend(data)
 
 
 class SelectorsTestCase(IsolatedAsyncioTestCase):
@@ -69,7 +72,6 @@ class SelectorsTestCase(IsolatedAsyncioTestCase):
                 reader.close()
                 writer.close()
 
-    @skip("temporary skip")
     async def test_blocking_interrupt(self):
         with TemporaryDirectory() as tmpdir:
             with TemporaryPipe(os.path.join(tmpdir, "temp.fifo")) as pipe_path:
@@ -87,7 +89,7 @@ class SelectorsTestCase(IsolatedAsyncioTestCase):
 
                 await gather(
                     to_thread(_selector_main, selector, result, event),
-                    to_thread(_selector_close, selector, event),
+                    to_thread(_selector_close, pipe_path, event),
                 )
                 self.assertEqual(test_data, result)
 
