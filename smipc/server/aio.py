@@ -2,93 +2,101 @@
 
 from abc import ABC, abstractmethod
 from asyncio import get_event_loop, run_coroutine_threadsafe
+from typing import Optional
 
 from smipc.decorators.override import override
 from smipc.server.base import BaseServer, Channel
-from smipc.variables import (
-    DEFAULT_ENCODING,
-    DEFAULT_FILE_MODE,
-    INFINITY_QUEUE_SIZE,
-    PUB2SUB_SUFFIX,
-    SUB2PUB_SUFFIX,
-)
+from smipc.variables import DEFAULT_ENCODING, INFINITY_QUEUE_SIZE
+
+
+class AioChannelInterface(ABC):
+    @abstractmethod
+    async def on_recv(self, data: bytes) -> None:
+        raise NotImplementedError
 
 
 class AioServerInterface(ABC):
     @abstractmethod
-    async def on_recv(self, channel: Channel, data: bytes) -> None:
+    async def on_recv(self, channel: "AioChannel", data: bytes) -> None:
         raise NotImplementedError
 
 
-class AioServer(AioServerInterface):
+class AioChannel(Channel, AioChannelInterface):
     def __init__(
         self,
-        root: str,
-        mode=DEFAULT_FILE_MODE,
+        key: str,
+        prefix: str,
+        encoding: str,
+        max_queue: int,
+        s2c_suffix: str,
+        c2s_suffix: str,
+        mode: int,
         *,
-        s2c_suffix=PUB2SUB_SUFFIX,
-        c2s_suffix=SUB2PUB_SUFFIX,
-        make_root=True,
+        server: Optional[AioServerInterface] = None,
     ):
-        self._server = BaseServer(
-            root=root,
-            mode=mode,
-            s2c_suffix=s2c_suffix,
-            c2s_suffix=c2s_suffix,
-            make_root=make_root,
+        super().__init__(
+            key,
+            prefix,
+            encoding,
+            max_queue,
+            s2c_suffix,
+            c2s_suffix,
+            mode,
+            make_fifo=True,
         )
+        loop = get_event_loop()
+        loop.add_reader(self.reader, self._reader_callback, server)
 
-    @property
-    def root(self):
-        return self._server.root
+    def _reader_callback(self, server: Optional[AioServerInterface] = None) -> None:
+        header, data = self.recv_with_header()
+        if data is None:
+            return
 
-    def __getitem__(self, key: str):
-        return self._server.__getitem__(key)
+        if server is not None:
+            coro = server.on_recv(self, data)
+        else:
+            coro = self.on_recv(data)
 
-    def __len__(self) -> int:
-        return self._server.__len__()
+        loop = get_event_loop()
+        run_coroutine_threadsafe(coro, loop)
 
-    def keys(self):
-        return self._server.keys()
+    @override
+    def close(self) -> None:
+        loop = get_event_loop()
+        loop.remove_reader(self.reader)
+        super().close()
 
-    def values(self):
-        return self._server.values()
+    @override
+    async def on_recv(self, data: bytes) -> None:
+        pass
 
-    def get_prefix(self, key: str) -> str:
-        return self._server.get_prefix(key)
+
+class AioServer(BaseServer, AioServerInterface):
+    def __getitem__(self, key: str) -> AioChannel:
+        return super().__getitem__(key)
 
     @override
     async def on_recv(self, channel: Channel, data: bytes) -> None:
         pass
 
-    def _reader_callback(self, channel: Channel) -> None:
-        header, data = channel.recv_with_header()
-        if data is None:
-            return
-
-        loop = get_event_loop()
-        coro = self.on_recv(channel, data)
-        run_coroutine_threadsafe(coro, loop)
-
+    @override
     def open(
         self,
         key: str,
         encoding=DEFAULT_ENCODING,
         max_queue=INFINITY_QUEUE_SIZE,
     ):
-        channel = self._server.open(key, encoding=encoding, max_queue=max_queue)
-        loop = get_event_loop()
-        loop.add_reader(channel.reader, self._reader_callback, channel)
+        if key in self.keys():
+            raise KeyError(f"Already opened channel: '{key}'")
+        channel = AioChannel(
+            key=key,
+            prefix=self.get_prefix(key),
+            encoding=encoding,
+            max_queue=max_queue,
+            s2c_suffix=self._s2c_suffix,
+            c2s_suffix=self._c2s_suffix,
+            mode=self._mode,
+            server=self,
+        )
+        self.add_channel(channel)
         return channel
-
-    def close(self, key: str) -> None:
-        channel = self._server[key]
-        loop = get_event_loop()
-        loop.remove_reader(channel.reader)
-        channel.close()
-
-    def cleanup(self, key: str) -> None:
-        self._server[key].cleanup()
-
-    def send(self, key: str, data: bytes):
-        return self._server[key].send(data)

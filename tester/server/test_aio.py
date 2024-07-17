@@ -7,6 +7,7 @@ from typing import List, Tuple
 from unittest import IsolatedAsyncioTestCase, main
 
 from smipc.decorators.override import override
+from smipc.protocols.header import Opcode
 from smipc.server.aio import AioServer
 from smipc.server.base import Channel
 
@@ -22,6 +23,7 @@ class _TestAioServer(AioServer):
     @override
     async def on_recv(self, channel: Channel, data: bytes) -> None:
         self.buffer.append((channel, data))
+        channel.send(data)
         self.event.set()
 
 
@@ -44,6 +46,9 @@ class AioTestCase(IsolatedAsyncioTestCase):
             buf = self.server.buffer.pop()
             self.assertEqual(key1, buf[0].key)
             self.assertEqual(data1, buf[1])
+
+            self.assertEqual(Opcode.SM_RESTORE, client1.recv_with_header()[0].opcode)
+            self.assertEqual(data1, client1.recv())
 
             client1.close()
             self.server.close(key1)

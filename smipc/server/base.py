@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 from smipc.pipe.duplex import FullDuplexPipe
 from smipc.pipe.reader import PipeReader
@@ -18,6 +18,9 @@ from smipc.variables import (
 
 
 class Channel:
+    _s2c: Optional[TemporaryPipe]
+    _c2s: Optional[TemporaryPipe]
+
     def __init__(
         self,
         key: str,
@@ -27,6 +30,8 @@ class Channel:
         s2c_suffix: str,
         c2s_suffix: str,
         mode: int,
+        *,
+        make_fifo=False,
     ):
         if s2c_suffix == c2s_suffix:
             raise ValueError("The 's2c_suffix' and 'c2s_suffix' cannot be the same")
@@ -34,20 +39,28 @@ class Channel:
         s2c_path = prefix + s2c_suffix
         c2s_path = prefix + c2s_suffix
 
-        if os.path.exists(s2c_path):
-            raise FileExistsError(f"s2c file already exists: '{s2c_path}'")
-        if os.path.exists(c2s_path):
-            raise FileExistsError(f"c2s file already exists: '{c2s_path}'")
-
         self._key = key
         self._encoding = encoding
         self._max_queue = max_queue
-        self._s2c = TemporaryPipe(s2c_path, mode=mode)
-        self._c2s = TemporaryPipe(c2s_path, mode=mode)
-        assert self._s2c.path == s2c_path
-        assert self._c2s.path == c2s_path
-        assert os.path.exists(s2c_path)
-        assert os.path.exists(c2s_path)
+
+        if make_fifo:
+            if os.path.exists(s2c_path):
+                raise FileExistsError(f"s2c file already exists: '{s2c_path}'")
+            if os.path.exists(c2s_path):
+                raise FileExistsError(f"c2s file already exists: '{c2s_path}'")
+            self._s2c = TemporaryPipe(s2c_path, mode=mode)
+            self._c2s = TemporaryPipe(c2s_path, mode=mode)
+            assert self._s2c.path == s2c_path
+            assert self._c2s.path == c2s_path
+            assert os.path.exists(s2c_path)
+            assert os.path.exists(c2s_path)
+        else:
+            if not os.path.exists(s2c_path):
+                raise FileNotFoundError(f"s2c file does not exist: '{s2c_path}'")
+            if not os.path.exists(c2s_path):
+                raise FileNotFoundError(f"c2s file does not exist: '{c2s_path}'")
+            self._s2c = None
+            self._c2s = None
 
         # ------------------------------------------------------
         # [WARNING] Do not change the calling order.
@@ -56,11 +69,19 @@ class Channel:
         _fake_writer_reader = PipeReader(s2c_path, blocking=False)
         try:
             writer = PipeWriter(s2c_path, blocking=False)
+        except:  # noqa
+            reader.close()
+            if self._s2c is not None:
+                self._s2c.cleanup()
+            if self._c2s is not None:
+                self._c2s.cleanup()
+            raise
         finally:
             _fake_writer_reader.close()
         # ------------------------------------------------------
 
-        self._proto = SmProtocol(FullDuplexPipe(writer, reader), encoding, max_queue)
+        pipe = FullDuplexPipe(writer, reader)
+        self._proto = SmProtocol(pipe, encoding, max_queue)
 
     @property
     def key(self):
@@ -78,8 +99,10 @@ class Channel:
         self._proto.close()
 
     def cleanup(self) -> None:
-        self._s2c.cleanup()
-        self._c2s.cleanup()
+        if self._s2c is not None:
+            self._s2c.cleanup()
+        if self._c2s is not None:
+            self._c2s.cleanup()
 
     def recv_with_header(self):
         return self._proto.recv_with_header()
@@ -147,6 +170,11 @@ class BaseServer:
     def get_prefix(self, key: str) -> str:
         return os.path.join(self._root, key)
 
+    def add_channel(self, channel: Channel) -> None:
+        if channel.key in self._channels:
+            raise KeyError(f"Already opened channel: '{channel.key}'")
+        self._channels[channel.key] = channel
+
     def open(
         self,
         key: str,
@@ -154,7 +182,7 @@ class BaseServer:
         max_queue=INFINITY_QUEUE_SIZE,
     ):
         if key in self._channels:
-            raise KeyError(f"Already opened publisher: '{key}'")
+            raise KeyError(f"Already opened channel: '{key}'")
         channel = Channel(
             key=key,
             prefix=self.get_prefix(key),
@@ -163,8 +191,9 @@ class BaseServer:
             s2c_suffix=self._s2c_suffix,
             c2s_suffix=self._c2s_suffix,
             mode=self._mode,
+            make_fifo=True,
         )
-        self._channels[key] = channel
+        self.add_channel(channel)
         return channel
 
     def close(self, key: str) -> None:
