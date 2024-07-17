@@ -24,36 +24,38 @@ class Channel:
         prefix: str,
         encoding: str,
         max_queue: int,
-        p2s_suffix: str,
-        s2p_suffix: str,
+        s2c_suffix: str,
+        c2s_suffix: str,
         mode: int,
     ):
-        if p2s_suffix == s2p_suffix:
-            raise ValueError("The 'p2s_suffix' and 's2p_suffix' cannot be the same")
+        if s2c_suffix == c2s_suffix:
+            raise ValueError("The 's2c_suffix' and 'c2s_suffix' cannot be the same")
 
-        p2s_path = prefix + p2s_suffix
-        s2p_path = prefix + s2p_suffix
+        s2c_path = prefix + s2c_suffix
+        c2s_path = prefix + c2s_suffix
 
-        if os.path.exists(p2s_path):
-            raise FileExistsError(f"p2s file already exists: '{p2s_path}'")
-        if os.path.exists(s2p_path):
-            raise FileExistsError(f"s2p file already exists: '{s2p_path}'")
+        if os.path.exists(s2c_path):
+            raise FileExistsError(f"s2c file already exists: '{s2c_path}'")
+        if os.path.exists(c2s_path):
+            raise FileExistsError(f"c2s file already exists: '{c2s_path}'")
 
         self._key = key
-        self._p2s = TemporaryPipe(p2s_path, mode=mode)
-        self._s2p = TemporaryPipe(s2p_path, mode=mode)
-        assert self._p2s.path == p2s_path
-        assert self._s2p.path == s2p_path
-        assert os.path.exists(p2s_path)
-        assert os.path.exists(s2p_path)
+        self._encoding = encoding
+        self._max_queue = max_queue
+        self._s2c = TemporaryPipe(s2c_path, mode=mode)
+        self._c2s = TemporaryPipe(c2s_path, mode=mode)
+        assert self._s2c.path == s2c_path
+        assert self._c2s.path == c2s_path
+        assert os.path.exists(s2c_path)
+        assert os.path.exists(c2s_path)
 
         # ------------------------------------------------------
         # [WARNING] Do not change the calling order.
-        reader = PipeReader(s2p_path, blocking=False)
+        reader = PipeReader(c2s_path, blocking=False)
 
-        _fake_writer_reader = PipeReader(p2s_path, blocking=False)
+        _fake_writer_reader = PipeReader(s2c_path, blocking=False)
         try:
-            writer = PipeWriter(p2s_path, blocking=False)
+            writer = PipeWriter(s2c_path, blocking=False)
         finally:
             _fake_writer_reader.close()
         # ------------------------------------------------------
@@ -76,14 +78,23 @@ class Channel:
         self._proto.close()
 
     def cleanup(self) -> None:
-        self._p2s.cleanup()
-        self._s2p.cleanup()
+        self._s2c.cleanup()
+        self._c2s.cleanup()
+
+    def recv_with_header(self):
+        return self._proto.recv_with_header()
 
     def recv(self):
-        return self._proto.recv_with_header()
+        return self._proto.recv()
 
     def send(self, data: bytes):
         return self._proto.send(data)
+
+    def create_client_proto(self, blocking=False):
+        reader = PipeReader(self._s2c.path, blocking=blocking)
+        writer = PipeWriter(self._c2s.path, blocking=blocking)
+        pipe = FullDuplexPipe(writer, reader)
+        return SmProtocol(pipe, encoding=self._encoding, max_queue=self._max_queue)
 
 
 class BaseServer:
@@ -94,12 +105,12 @@ class BaseServer:
         root: str,
         mode=DEFAULT_FILE_MODE,
         *,
-        p2s_suffix=PUB2SUB_SUFFIX,
-        s2p_suffix=SUB2PUB_SUFFIX,
+        s2c_suffix=PUB2SUB_SUFFIX,
+        c2s_suffix=SUB2PUB_SUFFIX,
         make_root=True,
     ):
-        if p2s_suffix == s2p_suffix:
-            raise ValueError("The 'p2s_suffix' and 's2p_suffix' cannot be the same")
+        if s2c_suffix == c2s_suffix:
+            raise ValueError("The 's2c_suffix' and 'c2s_suffix' cannot be the same")
 
         if make_root:
             if os.path.exists(root):
@@ -113,8 +124,8 @@ class BaseServer:
 
         self._root = root
         self._mode = mode
-        self._p2s_suffix = p2s_suffix
-        self._s2p_suffix = s2p_suffix
+        self._s2c_suffix = s2c_suffix
+        self._c2s_suffix = c2s_suffix
         self._channels = dict()
 
     @property
@@ -141,24 +152,29 @@ class BaseServer:
         key: str,
         encoding=DEFAULT_ENCODING,
         max_queue=INFINITY_QUEUE_SIZE,
-    ) -> None:
+    ):
         if key in self._channels:
             raise KeyError(f"Already opened publisher: '{key}'")
-        self._channels[key] = Channel(
+        channel = Channel(
             key=key,
             prefix=self.get_prefix(key),
             encoding=encoding,
             max_queue=max_queue,
-            p2s_suffix=self._p2s_suffix,
-            s2p_suffix=self._s2p_suffix,
+            s2c_suffix=self._s2c_suffix,
+            c2s_suffix=self._c2s_suffix,
             mode=self._mode,
         )
+        self._channels[key] = channel
+        return channel
 
     def close(self, key: str) -> None:
         self._channels[key].close()
 
     def cleanup(self, key: str) -> None:
         self._channels[key].cleanup()
+
+    def recv_with_header(self, key: str):
+        return self._channels[key].recv_with_header()
 
     def recv(self, key: str):
         return self._channels[key].recv()
