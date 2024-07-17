@@ -42,7 +42,7 @@ class FullDuplexPipe:
 
         # ------------------------------------------------------------
         # [WARNING] Do not change the calling order.
-        reader = PipeReader(reader_path)
+        reader = PipeReader(reader_path, blocking=False)
         try:
             if blocking is not None:
                 writer = blocking_pipe_writer(writer_path, open_timeout, blocking)

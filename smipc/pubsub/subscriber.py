@@ -45,10 +45,6 @@ class Subscriber(ProtocolInterface):
         self._proto.close()
 
     @override
-    def cleanup(self) -> None:
-        pass
-
-    @override
     def recv(self) -> Optional[bytes]:
         return self._proto.recv()
 

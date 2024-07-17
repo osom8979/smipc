@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 
 from abc import ABC, abstractmethod
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Tuple
 
 from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
 from smipc.pipe.writer import PipeWriter
-from smipc.protocols.header import EMPTY_HEADER_PACKET, Header, HeaderPacket, Opcode
+from smipc.protocols.header import Header, HeaderPacket, Opcode
 from smipc.sm.written import SmWritten
 from smipc.variables import DEFAULT_ENCODING, DEFAULT_PIPE_BUF
 
 
 def calc_writer_size(writer: PipeWriter, header: Header) -> int:
     try:
-        return writer.get_pipe_buf() - header.size
+        return writer.pipe_buf - header.size
     except:  # noqa
         return DEFAULT_PIPE_BUF - header.size
 
@@ -27,10 +27,6 @@ class WrittenInfo(NamedTuple):
 class ProtocolInterface(ABC):
     @abstractmethod
     def close(self) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def cleanup(self) -> None:
         raise NotImplementedError
 
     @abstractmethod
@@ -93,12 +89,8 @@ class BaseProtocol(ProtocolInterface, SmInterface, ABC):
         self._pipe.close()
         self.close_sm()
 
-    @override
-    def cleanup(self) -> None:
-        pass
-
     def send_empty(self) -> WrittenInfo:
-        pipe_byte = self._pipe.write(EMPTY_HEADER_PACKET)
+        pipe_byte = self._pipe.write(self._header.encode_empty())
         return WrittenInfo(pipe_byte, 0, None)
 
     def send_pipe_direct(self, data: bytes) -> WrittenInfo:
@@ -153,18 +145,21 @@ class BaseProtocol(ProtocolInterface, SmInterface, ABC):
         name = self._pipe.read(header.pipe_data_size)
         self.restore_sm(name)
 
-    @override
-    def recv(self) -> Optional[bytes]:
+    def recv_with_header(self) -> Tuple[HeaderPacket, Optional[bytes]]:
         header_data = self._pipe.read(self._header.size)
         header = self._header.decode(header_data)
         if header.opcode == Opcode.EMPTY:
-            return None
+            return header, None
         if header.opcode == Opcode.PIPE_DIRECT:
-            return self.recv_pipe_direct(header)
+            return header, self.recv_pipe_direct(header)
         elif header.opcode == Opcode.SM_OVER_PIPE:
-            return self.recv_sm_over_pipe(header)
+            return header, self.recv_sm_over_pipe(header)
         elif header.opcode == Opcode.SM_RESTORE:
             self.recv_sm_restore(header)
-            return None
+            return header, None
         else:
             raise ValueError(f"Unsupported opcode: {header.opcode}")
+
+    @override
+    def recv(self) -> Optional[bytes]:
+        return self.recv_with_header()[1]

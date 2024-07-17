@@ -51,7 +51,7 @@ def wait_pipe_writer(
     begin = time()
     while not event.is_set():
         try:
-            return PipeWriter(path, open_blocking=False)
+            return PipeWriter(path, blocking=False)
         except OSError as e:
             if e.errno == ENXIO:
                 # No such device or address
@@ -104,7 +104,7 @@ def _blocking_pipe_writer_open(
     result: _BlockingPipeWriterResult,
 ) -> None:
     try:
-        writer = PipeWriter(path, open_blocking=True)
+        writer = PipeWriter(path, blocking=True)
     except BaseException as e:
         result.set_error(e)
     else:

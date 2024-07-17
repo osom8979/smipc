@@ -56,14 +56,13 @@ class Publisher(ProtocolInterface):
             blocking=blocking,
         )
 
-    @override
-    def close(self) -> None:
-        self._proto.close()
-
-    @override
     def cleanup(self) -> None:
         self._p2s.cleanup()
         self._s2p.cleanup()
+
+    @override
+    def close(self) -> None:
+        self._proto.close()
 
     @override
     def recv(self) -> Optional[bytes]:
