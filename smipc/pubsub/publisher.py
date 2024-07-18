@@ -9,11 +9,11 @@ from smipc.pipe.temp import TemporaryPipe
 from smipc.protocols.base import ProtocolInterface, WrittenInfo
 from smipc.protocols.sm import SmProtocol
 from smipc.variables import (
+    CLIENT_TO_SERVER_SUFFIX,
     DEFAULT_ENCODING,
     DEFAULT_FILE_MODE,
     INFINITY_QUEUE_SIZE,
-    PUB2SUB_SUFFIX,
-    SUB2PUB_SUFFIX,
+    SERVER_TO_CLIENT_SUFFIX,
 )
 
 
@@ -24,8 +24,8 @@ class Publisher(ProtocolInterface):
         open_timeout: Optional[float] = None,
         encoding=DEFAULT_ENCODING,
         max_queue=INFINITY_QUEUE_SIZE,
-        p2s_suffix=PUB2SUB_SUFFIX,
-        s2p_suffix=SUB2PUB_SUFFIX,
+        p2s_suffix=SERVER_TO_CLIENT_SUFFIX,
+        s2p_suffix=CLIENT_TO_SERVER_SUFFIX,
         mode=DEFAULT_FILE_MODE,
         *,
         interval=0.001,

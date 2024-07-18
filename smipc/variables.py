@@ -8,8 +8,8 @@ DEFAULT_ENCODING: Final[str] = "utf-8"
 
 INFINITY_QUEUE_SIZE: Final[int] = -1
 
-PUB2SUB_SUFFIX: Final[str] = ".p2s.smipc"
-SUB2PUB_SUFFIX: Final[str] = ".s2p.smipc"
+SERVER_TO_CLIENT_SUFFIX: Final[str] = ".s2c.smipc"
+CLIENT_TO_SERVER_SUFFIX: Final[str] = ".c2s.smipc"
 
 # https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/cuda/detail/OffsetCalculator.cuh
 # If element_sizes is nullptr, then the strides will be in bytes, otherwise

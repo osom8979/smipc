@@ -16,12 +16,12 @@ class BaseTestCase(TestCase):
 
             key1 = "1"
             channel1 = self.server.open(key1)
-            client1 = channel1.create_client_proto()
+            client1 = self.server.create_client_channel(key1)
             self.assertEqual(1, len(self.server))
 
             key2 = "2"
             channel2 = self.server.open(key2)
-            client2 = channel2.create_client_proto()
+            client2 = self.server.create_client_channel(key2)
             self.assertEqual(2, len(self.server))
 
             data1 = b"RGB" * 3840 * 2160  # 4K RGB Image
@@ -31,6 +31,7 @@ class BaseTestCase(TestCase):
             self.assertEqual(len(data1), client1.send(data1).sm_byte)
             self.assertEqual(data1, channel1.recv())
             self.assertEqual(Opcode.SM_RESTORE, client1.recv_with_header()[0].opcode)
+
             channel1.close()
             client1.close()
             channel1.cleanup()
@@ -42,6 +43,7 @@ class BaseTestCase(TestCase):
             self.assertEqual(len(data2), client2.send(data2).sm_byte)
             self.assertEqual(data2, channel2.recv())
             self.assertEqual(Opcode.SM_RESTORE, client2.recv_with_header()[0].opcode)
+
             channel2.close()
             client2.close()
             channel2.cleanup()

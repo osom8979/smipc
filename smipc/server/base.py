@@ -1,91 +1,50 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import Dict, Optional
+from abc import ABC, abstractmethod
+from typing import Dict, NamedTuple, Optional
+from weakref import ReferenceType, ref
 
+from smipc.decorators.override import override
 from smipc.pipe.duplex import FullDuplexPipe
 from smipc.pipe.reader import PipeReader
-from smipc.pipe.temp import TemporaryPipe
+from smipc.pipe.temp_pair import TemporaryPipePair
 from smipc.pipe.writer import PipeWriter
 from smipc.protocols.sm import SmProtocol
 from smipc.variables import (
+    CLIENT_TO_SERVER_SUFFIX,
     DEFAULT_ENCODING,
     DEFAULT_FILE_MODE,
     INFINITY_QUEUE_SIZE,
-    PUB2SUB_SUFFIX,
-    SUB2PUB_SUFFIX,
+    SERVER_TO_CLIENT_SUFFIX,
 )
 
 
-class Channel:
-    _s2c: Optional[TemporaryPipe]
-    _c2s: Optional[TemporaryPipe]
+class PathPair(NamedTuple):
+    s2c: str
+    c2s: str
 
+
+class Channel:
     def __init__(
         self,
         key: str,
-        prefix: str,
-        encoding: str,
-        max_queue: int,
-        s2c_suffix: str,
-        c2s_suffix: str,
-        mode: int,
-        *,
-        make_fifo=False,
+        proto: SmProtocol,
+        weak_base: Optional[ReferenceType["BaseServer"]] = None,
+        fifos: Optional[TemporaryPipePair] = None,
     ):
-        if s2c_suffix == c2s_suffix:
-            raise ValueError("The 's2c_suffix' and 'c2s_suffix' cannot be the same")
-
-        s2c_path = prefix + s2c_suffix
-        c2s_path = prefix + c2s_suffix
-
         self._key = key
-        self._encoding = encoding
-        self._max_queue = max_queue
-
-        if make_fifo:
-            if os.path.exists(s2c_path):
-                raise FileExistsError(f"s2c file already exists: '{s2c_path}'")
-            if os.path.exists(c2s_path):
-                raise FileExistsError(f"c2s file already exists: '{c2s_path}'")
-            self._s2c = TemporaryPipe(s2c_path, mode=mode)
-            self._c2s = TemporaryPipe(c2s_path, mode=mode)
-            assert self._s2c.path == s2c_path
-            assert self._c2s.path == c2s_path
-            assert os.path.exists(s2c_path)
-            assert os.path.exists(c2s_path)
-        else:
-            if not os.path.exists(s2c_path):
-                raise FileNotFoundError(f"s2c file does not exist: '{s2c_path}'")
-            if not os.path.exists(c2s_path):
-                raise FileNotFoundError(f"c2s file does not exist: '{c2s_path}'")
-            self._s2c = None
-            self._c2s = None
-
-        # ------------------------------------------------------
-        # [WARNING] Do not change the calling order.
-        reader = PipeReader(c2s_path, blocking=False)
-
-        _fake_writer_reader = PipeReader(s2c_path, blocking=False)
-        try:
-            writer = PipeWriter(s2c_path, blocking=False)
-        except:  # noqa
-            reader.close()
-            if self._s2c is not None:
-                self._s2c.cleanup()
-            if self._c2s is not None:
-                self._c2s.cleanup()
-            raise
-        finally:
-            _fake_writer_reader.close()
-        # ------------------------------------------------------
-
-        pipe = FullDuplexPipe(writer, reader)
-        self._proto = SmProtocol(pipe, encoding, max_queue)
+        self._proto = proto
+        self._fifos = fifos
+        self._weak_base = weak_base
 
     @property
     def key(self):
         return self._key
+
+    @property
+    def proto(self):
+        return self._proto
 
     @property
     def reader(self):
@@ -95,14 +54,19 @@ class Channel:
     def writer(self):
         return self._proto.pipe.writer
 
+    @property
+    def base(self):
+        if self._weak_base is None:
+            return None
+        else:
+            return self._weak_base()
+
     def close(self) -> None:
         self._proto.close()
 
     def cleanup(self) -> None:
-        if self._s2c is not None:
-            self._s2c.cleanup()
-        if self._c2s is not None:
-            self._c2s.cleanup()
+        if self._fifos is not None:
+            self._fifos.cleanup()
 
     def recv_with_header(self):
         return self._proto.recv_with_header()
@@ -113,23 +77,31 @@ class Channel:
     def send(self, data: bytes):
         return self._proto.send(data)
 
-    def create_client_proto(self, blocking=False):
-        reader = PipeReader(self._s2c.path, blocking=blocking)
-        writer = PipeWriter(self._c2s.path, blocking=blocking)
-        pipe = FullDuplexPipe(writer, reader)
-        return SmProtocol(pipe, encoding=self._encoding, max_queue=self._max_queue)
+
+class BaseServerInterface(ABC):
+    @abstractmethod
+    def on_create_channel(
+        self,
+        key: str,
+        proto: SmProtocol,
+        weak_base: Optional[ReferenceType],
+        fifos: Optional[TemporaryPipePair],
+    ):
+        raise NotImplementedError
 
 
-class BaseServer:
+class BaseServer(BaseServerInterface):
     _channels: Dict[str, Channel]
 
     def __init__(
         self,
         root: str,
         mode=DEFAULT_FILE_MODE,
+        encoding=DEFAULT_ENCODING,
+        max_queue=INFINITY_QUEUE_SIZE,
         *,
-        s2c_suffix=PUB2SUB_SUFFIX,
-        c2s_suffix=SUB2PUB_SUFFIX,
+        s2c_suffix=SERVER_TO_CLIENT_SUFFIX,
+        c2s_suffix=CLIENT_TO_SERVER_SUFFIX,
         make_root=True,
     ):
         if s2c_suffix == c2s_suffix:
@@ -147,6 +119,8 @@ class BaseServer:
 
         self._root = root
         self._mode = mode
+        self._encoding = encoding
+        self._max_queue = max_queue
         self._s2c_suffix = s2c_suffix
         self._c2s_suffix = c2s_suffix
         self._channels = dict()
@@ -170,30 +144,85 @@ class BaseServer:
     def get_prefix(self, key: str) -> str:
         return os.path.join(self._root, key)
 
-    def add_channel(self, channel: Channel) -> None:
-        if channel.key in self._channels:
-            raise KeyError(f"Already opened channel: '{channel.key}'")
-        self._channels[channel.key] = channel
+    def get_path_pair(self, key: str, flip=False) -> PathPair:
+        prefix = self.get_prefix(key)
+        s2c_path = prefix + self._s2c_suffix
+        c2s_path = prefix + self._c2s_suffix
+        if flip:
+            return PathPair(c2s_path, s2c_path)
+        else:
+            return PathPair(s2c_path, c2s_path)
 
-    def open(
+    def create_fifos(self, paths: PathPair):
+        s2c_path = paths.s2c
+        c2s_path = paths.c2s
+        return TemporaryPipePair(s2c_path, c2s_path, self._mode)
+
+    @staticmethod
+    def create_pipe(paths: PathPair, blocking=False, *, no_faker=False):
+        s2c_path = paths.s2c
+        c2s_path = paths.c2s
+
+        if not os.path.exists(s2c_path):
+            raise FileNotFoundError(f"s2c file does not exist: '{s2c_path}'")
+        if not os.path.exists(c2s_path):
+            raise FileNotFoundError(f"c2s file does not exist: '{c2s_path}'")
+
+        # ------------------------------------------------------
+        # [WARNING] Do not change the calling order.
+        reader = PipeReader(c2s_path, blocking=blocking)
+
+        _fake_writer_reader = None if no_faker else PipeReader(s2c_path, blocking=False)
+        try:
+            writer = PipeWriter(s2c_path, blocking=blocking)
+        except:  # noqa
+            raise
+        finally:
+            if _fake_writer_reader is not None:
+                _fake_writer_reader.close()
+        # ------------------------------------------------------
+
+        return FullDuplexPipe(writer, reader)
+
+    def create_proto(self, pipe: FullDuplexPipe):
+        return SmProtocol(
+            pipe=pipe,
+            encoding=self._encoding,
+            max_queue=self._max_queue,
+        )
+
+    @override
+    def on_create_channel(
         self,
         key: str,
-        encoding=DEFAULT_ENCODING,
-        max_queue=INFINITY_QUEUE_SIZE,
+        proto: SmProtocol,
+        weak_base: Optional[ReferenceType],
+        fifos: Optional[TemporaryPipePair],
     ):
+        return Channel(key, proto, weak_base, fifos)
+
+    def create_server_channel(self, key: str):
+        # ------------------------------------------
+        # [WARNING] Do not change the calling order.
+        paths = self.get_path_pair(key)
+        fifos = self.create_fifos(paths)
+        pipe = self.create_pipe(paths, blocking=False, no_faker=False)
+        proto = self.create_proto(pipe)
+        # ------------------------------------------
+        return self.on_create_channel(key, proto, ref(self), fifos)
+
+    def create_client_channel(self, key: str, blocking=False):
+        paths = self.get_path_pair(key, flip=True)
+        pipe = self.create_pipe(paths, blocking=blocking, no_faker=True)
+        proto = self.create_proto(pipe)
+        return self.on_create_channel(key, proto, None, None)
+
+    def open(self, key: str):
         if key in self._channels:
             raise KeyError(f"Already opened channel: '{key}'")
-        channel = Channel(
-            key=key,
-            prefix=self.get_prefix(key),
-            encoding=encoding,
-            max_queue=max_queue,
-            s2c_suffix=self._s2c_suffix,
-            c2s_suffix=self._c2s_suffix,
-            mode=self._mode,
-            make_fifo=True,
-        )
-        self.add_channel(channel)
+
+        channel = self.create_server_channel(key)
+        self._channels[channel.key] = channel
         return channel
 
     def close(self, key: str) -> None:

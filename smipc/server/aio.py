@@ -3,10 +3,28 @@
 from abc import ABC, abstractmethod
 from asyncio import get_event_loop, run_coroutine_threadsafe
 from typing import Optional
+from weakref import ReferenceType
 
 from smipc.decorators.override import override
+from smipc.pipe.temp_pair import TemporaryPipePair
+from smipc.protocols.sm import SmProtocol
 from smipc.server.base import BaseServer, Channel
-from smipc.variables import DEFAULT_ENCODING, INFINITY_QUEUE_SIZE
+
+
+def _aio_channel_reader(channel: "AioChannel") -> None:
+    header, data = channel.proto.recv_with_header()
+    if data is None:
+        return
+
+    base = channel.base
+    if base is not None:
+        assert isinstance(base, AioServer)
+        coro = base.on_recv(channel, data)
+    else:
+        coro = channel.on_recv(data)
+
+    loop = get_event_loop()
+    run_coroutine_threadsafe(coro, loop)
 
 
 class AioChannelInterface(ABC):
@@ -15,50 +33,17 @@ class AioChannelInterface(ABC):
         raise NotImplementedError
 
 
-class AioServerInterface(ABC):
-    @abstractmethod
-    async def on_recv(self, channel: "AioChannel", data: bytes) -> None:
-        raise NotImplementedError
-
-
 class AioChannel(Channel, AioChannelInterface):
     def __init__(
         self,
         key: str,
-        prefix: str,
-        encoding: str,
-        max_queue: int,
-        s2c_suffix: str,
-        c2s_suffix: str,
-        mode: int,
-        *,
-        server: Optional[AioServerInterface] = None,
+        proto: SmProtocol,
+        weak_base: Optional[ReferenceType["BaseServer"]] = None,
+        fifos: Optional[TemporaryPipePair] = None,
     ):
-        super().__init__(
-            key,
-            prefix,
-            encoding,
-            max_queue,
-            s2c_suffix,
-            c2s_suffix,
-            mode,
-            make_fifo=True,
-        )
+        super().__init__(key, proto, weak_base, fifos)
         loop = get_event_loop()
-        loop.add_reader(self.reader, self._reader_callback, server)
-
-    def _reader_callback(self, server: Optional[AioServerInterface] = None) -> None:
-        header, data = self.recv_with_header()
-        if data is None:
-            return
-
-        if server is not None:
-            coro = server.on_recv(self, data)
-        else:
-            coro = self.on_recv(data)
-
-        loop = get_event_loop()
-        run_coroutine_threadsafe(coro, loop)
+        loop.add_reader(self.reader, _aio_channel_reader, self)
 
     @override
     def close(self) -> None:
@@ -67,36 +52,45 @@ class AioChannel(Channel, AioChannelInterface):
         super().close()
 
     @override
+    def recv_with_header(self):
+        raise RuntimeError(
+            f"{type(self).__name__} requires data to be received through callbacks"
+        )
+
+    @override
+    def recv(self):
+        raise RuntimeError(
+            f"{type(self).__name__} requires data to be received through callbacks"
+        )
+
+    @override
     async def on_recv(self, data: bytes) -> None:
         pass
 
 
+class AioServerInterface(ABC):
+    @abstractmethod
+    async def on_recv(self, channel: AioChannel, data: bytes) -> None:
+        raise NotImplementedError
+
+
 class AioServer(BaseServer, AioServerInterface):
-    def __getitem__(self, key: str) -> AioChannel:
-        return super().__getitem__(key)
-
     @override
-    async def on_recv(self, channel: Channel, data: bytes) -> None:
-        pass
-
-    @override
-    def open(
+    def on_create_channel(
         self,
         key: str,
-        encoding=DEFAULT_ENCODING,
-        max_queue=INFINITY_QUEUE_SIZE,
+        proto: SmProtocol,
+        weak_base: Optional[ReferenceType],
+        fifos: Optional[TemporaryPipePair],
     ):
-        if key in self.keys():
-            raise KeyError(f"Already opened channel: '{key}'")
-        channel = AioChannel(
-            key=key,
-            prefix=self.get_prefix(key),
-            encoding=encoding,
-            max_queue=max_queue,
-            s2c_suffix=self._s2c_suffix,
-            c2s_suffix=self._c2s_suffix,
-            mode=self._mode,
-            server=self,
-        )
-        self.add_channel(channel)
-        return channel
+        return AioChannel(key, proto, weak_base, fifos)
+
+    @override
+    async def on_recv(self, channel: AioChannel, data: bytes) -> None:
+        pass
+
+    def create_synced_client_channel(self, key: str, blocking=False):
+        paths = self.get_path_pair(key, flip=True)
+        pipe = self.create_pipe(paths, blocking=blocking, no_faker=True)
+        proto = self.create_proto(pipe)
+        return BaseServer.on_create_channel(self, key, proto, None, None)

@@ -8,13 +8,13 @@ from unittest import IsolatedAsyncioTestCase, main
 from smipc.pipe.wait import wait_exists
 from smipc.pubsub.publisher import Publisher
 from smipc.pubsub.subscriber import Subscriber
-from smipc.variables import PUB2SUB_SUFFIX, SUB2PUB_SUFFIX
+from smipc.variables import CLIENT_TO_SERVER_SUFFIX, SERVER_TO_CLIENT_SUFFIX
 
 
 class PubsubTestCase(IsolatedAsyncioTestCase):
     def setUp(self):
-        self.p2s_suffix = PUB2SUB_SUFFIX
-        self.s2p_suffix = SUB2PUB_SUFFIX
+        self.p2s_suffix = SERVER_TO_CLIENT_SUFFIX
+        self.s2p_suffix = CLIENT_TO_SERVER_SUFFIX
         self.wait_timeout = 4.0
 
     def create_publisher(self, prefix: str):

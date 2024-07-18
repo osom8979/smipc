@@ -7,10 +7,10 @@ from smipc.decorators.override import override
 from smipc.protocols.base import ProtocolInterface, WrittenInfo
 from smipc.protocols.sm import SmProtocol
 from smipc.variables import (
+    CLIENT_TO_SERVER_SUFFIX,
     DEFAULT_ENCODING,
     INFINITY_QUEUE_SIZE,
-    PUB2SUB_SUFFIX,
-    SUB2PUB_SUFFIX,
+    SERVER_TO_CLIENT_SUFFIX,
 )
 
 
@@ -21,8 +21,8 @@ class Subscriber(ProtocolInterface):
         max_queue=INFINITY_QUEUE_SIZE,
         open_timeout: Optional[float] = None,
         encoding=DEFAULT_ENCODING,
-        p2s_suffix=PUB2SUB_SUFFIX,
-        s2p_suffix=SUB2PUB_SUFFIX,
+        p2s_suffix=SERVER_TO_CLIENT_SUFFIX,
+        s2p_suffix=CLIENT_TO_SERVER_SUFFIX,
     ):
         p2s_path = prefix + p2s_suffix
         s2p_path = prefix + s2p_suffix
