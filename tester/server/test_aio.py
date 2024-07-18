@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import os
-from asyncio import Event
+from asyncio import Queue
 from tempfile import TemporaryDirectory
-from typing import List, Optional, Tuple
+from time import time
+from typing import Optional
 from unittest import IsolatedAsyncioTestCase, main
 from weakref import ReferenceType
 
@@ -14,26 +15,19 @@ from smipc.server.aio import AioChannel, AioServer
 
 
 class _TestAioChannel(AioChannel):
-    buffer: List[bytes]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.buffer = list()
-        self.event = Event()
+        self.buffer = Queue[bytes]()
 
     @override
     async def on_recv(self, data: bytes) -> None:
-        self.buffer.append(data)
-        self.event.set()
+        await self.buffer.put(data)
 
 
 class _TestAioServer(AioServer):
-    buffer: List[Tuple[AioChannel, bytes]]
-
     def __init__(self, root: str):
         super().__init__(root)
-        self.buffer = list()
-        self.event = Event()
+        self.buffer = Queue[bytes]()
 
     @override
     def on_create_channel(
@@ -47,28 +41,26 @@ class _TestAioServer(AioServer):
 
     @override
     async def on_recv(self, channel: AioChannel, data: bytes) -> None:
-        self.buffer.append((channel, data))
+        await self.buffer.put(data)
         channel.send(data)
-        self.event.set()
 
 
 class AioTestCase(IsolatedAsyncioTestCase):
     async def test_default(self):
         with TemporaryDirectory() as tmpdir:
             self.assertTrue(os.path.isdir(tmpdir))
-            self.server = _TestAioServer(tmpdir)
+            server = _TestAioServer(tmpdir)
 
             key1 = "1"
-            self.server.open(key1)
-            client1 = self.server.create_client_channel(key1)
+            server.open(key1)
+            client1 = server.create_client_channel(key1)
             self.assertIsInstance(client1, _TestAioChannel)
-            self.assertEqual(1, len(self.server))
-            self.assertEqual(0, len(self.server.buffer))
+            self.assertEqual(1, len(server))
 
             with self.assertRaises(RuntimeError):
-                self.server.recv(key1)
+                server.recv(key1)
             with self.assertRaises(RuntimeError):
-                self.server.recv_with_header(key1)
+                server.recv_with_header(key1)
 
             with self.assertRaises(RuntimeError):
                 client1.recv()
@@ -76,23 +68,36 @@ class AioTestCase(IsolatedAsyncioTestCase):
                 client1.recv_with_header()
 
             data1 = b"RGB" * 3840 * 2160  # 4K RGB Image
+            # data1 = b"RGB" * 1920 * 1080  # FHD
+
             self.assertEqual(len(data1), client1.send(data1).sm_byte)
+            server_buf1 = await server.buffer.get()
+            self.assertEqual(data1, server_buf1)
+            client_buf1 = await client1.buffer.get()
+            self.assertEqual(data1, client_buf1)
 
-            await self.server.event.wait()
-            self.assertEqual(1, len(self.server.buffer))
+            count = 10
+            total_duration = 0.0
 
-            buf = self.server.buffer.pop()
-            self.assertEqual(key1, buf[0].key)
-            self.assertEqual(data1, buf[1])
+            for _ in range(count):
+                begin = time()
+                self.assertEqual(len(data1), client1.send(data1).sm_byte)
 
-            await client1.event.wait()
-            self.assertEqual(1, len(client1.buffer))
-            client_buf = client1.buffer.pop()
-            self.assertEqual(data1, client_buf)
+                server_buf1 = await server.buffer.get()
+                self.assertEqual(data1, server_buf1)
+
+                client_buf1 = await client1.buffer.get()
+                self.assertEqual(data1, client_buf1)
+
+                duration = time() - begin
+                total_duration += duration
+
+            mean_duration = total_duration / count
+            print(f"\nMean duration: {mean_duration:.3f}s (count={count})")
 
             client1.close()
-            self.server.close(key1)
-            self.server.cleanup(key1)
+            server.close(key1)
+            server.cleanup(key1)
 
 
 if __name__ == "__main__":
