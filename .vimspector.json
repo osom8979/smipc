@@ -15,7 +15,7 @@
                 "console": "integratedTerminal",
                 "cwd": "${workspaceRoot}",
                 "python": "${workspaceRoot}/python",
-                "program": "${workspaceRoot}/tester/cuda/test_handler.py",
+                "program": "${workspaceRoot}/tester/cuda/test_cupy.py",
                 "env": {
                     "PYTHONPATH": "${workspaceRoot}"
                 },

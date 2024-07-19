@@ -3,14 +3,11 @@
 from unittest import TestCase, main, skipIf
 
 from smipc.cuda.handler import CudaHandler
-from smipc.cuda.utils import compatible_ipc, has_cupy
+from smipc.cuda.utils import has_cupy
 
 
 @skipIf(not has_cupy(), "The cupy package is required for the CudaHandler")
 class HandlerTestCase(TestCase):
-    def test_compatible_ipc(self):
-        self.assertTrue(compatible_ipc())
-
     def test_default(self):
         handler = CudaHandler()
         self.assertIsNone(handler.memory)

@@ -4,6 +4,46 @@ from typing import Optional
 
 from smipc.cuda.memory import CudaMemory
 
+try:
+    import cupy
+except ImportError:
+    pass
+
+
+def get_device_count():
+    return cupy.cuda.runtime.getDeviceCount()
+
+
+def get_device_properties(device_index: int):
+    return cupy.cuda.runtime.getDeviceProperties(device_index)
+
+
+def ipc_get_mem_handle(device_ptr: int):
+    return cupy.cuda.runtime.ipcGetMemHandle(device_ptr)
+
+
+def ipc_open_mem_handle(handle, flags: Optional[int] = None):
+    if flags is None:
+        flags = cupy.cuda.runtime.cudaIpcMemLazyEnablePeerAccess
+    assert isinstance(flags, int)
+    return cupy.cuda.runtime.ipcOpenMemHandle(handle, flags)
+
+
+def ipc_close_mem_handle(device_ptr: int):
+    return cupy.cuda.runtime.ipcCloseMemHandle(device_ptr)
+
+
+def ipc_get_event_handle(event: int):
+    return cupy.cuda.runtime.ipcGetEventHandle(event)
+
+
+def ipc_open_event_handle(handle):
+    return cupy.cuda.runtime.ipcOpenEventHandle(handle)
+
+
+def alloc_pinned_array(size: int):
+    return cupy.cuda.alloc_pinned_memory(size)
+
 
 class CudaHandler:
     _mem: Optional[CudaMemory]

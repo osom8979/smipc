@@ -20,6 +20,16 @@ def has_cupy() -> bool:
 
 
 @lru_cache
+def has_numpy() -> bool:
+    try:
+        import numpy  # noqa
+    except ImportError:
+        return False
+    else:
+        return True
+
+
+@lru_cache
 def compatible_ipc() -> bool:
     if platform.system().lower() != "linux":
         raise CompatibleError("The application only supported on Linux OS.")
