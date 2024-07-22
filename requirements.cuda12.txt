@@ -1,0 +1,2 @@
+# CUDA v12.x (x86_64 / aarch64)
+cupy-cuda12x

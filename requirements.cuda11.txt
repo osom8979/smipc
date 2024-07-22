@@ -1,0 +1,2 @@
+# CUDA v11.2 ~ 11.8 (x86_64 / aarch64)
+cupy-cuda11x
