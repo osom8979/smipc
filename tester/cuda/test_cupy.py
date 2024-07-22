@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from gc import collect
-from typing import Final
 from unittest import TestCase, main, skipIf
 
-from smipc.cuda.utils import has_cupy, has_numpy
-
-_ALLOC_PADDING_SIZE: Final[int] = 512
+from smipc.cuda.utils import ALLOCATION_UNIT_SIZE, has_cupy, has_numpy
 
 
 @skipIf(
@@ -15,6 +12,7 @@ _ALLOC_PADDING_SIZE: Final[int] = 512
 )
 class CupyTestCase(TestCase):
     def setUp(self):
+        # noinspection PyUnresolvedReferences
         import cupy as _cp
         import numpy as _np
 
@@ -25,12 +23,12 @@ class CupyTestCase(TestCase):
         cpu_pool = self.cp.get_default_pinned_memory_pool()
         self.assertEqual(0, cpu_pool.n_free_blocks())
 
-        size1_alloc = _ALLOC_PADDING_SIZE
+        size1_alloc = ALLOCATION_UNIT_SIZE
         size1 = 4
         mem1 = cpu_pool.malloc(size1_alloc)
         self.assertEqual(0, cpu_pool.n_free_blocks())
 
-        arr1 = self.np.frombuffer(mem1, self.np.int8, size1).reshape((size1))
+        arr1 = self.np.frombuffer(mem1, self.np.int8, size1).reshape((size1,))
         self.assertEqual(0, cpu_pool.n_free_blocks())
         self.assertEqual([0, 0, 0, 0], arr1.tolist())
 
@@ -41,7 +39,7 @@ class CupyTestCase(TestCase):
         collect()
         self.assertEqual(0, cpu_pool.n_free_blocks())
 
-        arr2 = self.np.frombuffer(mem1, self.np.int8, size1).reshape((size1))
+        arr2 = self.np.frombuffer(mem1, self.np.int8, size1).reshape((size1,))
         self.assertEqual(0, cpu_pool.n_free_blocks())
         self.assertEqual([1, 1, 1, 1], arr2.tolist())
 
@@ -55,12 +53,12 @@ class CupyTestCase(TestCase):
         self.assertEqual(1, cpu_pool.n_free_blocks())
         # ----
 
-        size2_alloc = _ALLOC_PADDING_SIZE + 1
+        size2_alloc = ALLOCATION_UNIT_SIZE + 1
         size2 = 8
         mem2 = cpu_pool.malloc(size2_alloc)
         self.assertEqual(1, cpu_pool.n_free_blocks())
 
-        arr3 = self.np.frombuffer(mem2, self.np.int8, size2).reshape((size2))
+        arr3 = self.np.frombuffer(mem2, self.np.int8, size2).reshape((size2,))
         self.assertEqual(1, cpu_pool.n_free_blocks())
         self.assertEqual([0, 0, 0, 0, 0, 0, 0, 0], arr3.tolist())
 
@@ -71,7 +69,7 @@ class CupyTestCase(TestCase):
         collect()
         self.assertEqual(1, cpu_pool.n_free_blocks())
 
-        arr4 = self.np.frombuffer(mem2, self.np.int8, size2).reshape((size2))
+        arr4 = self.np.frombuffer(mem2, self.np.int8, size2).reshape((size2,))
         self.assertEqual(1, cpu_pool.n_free_blocks())
         self.assertEqual([2, 2, 2, 2, 2, 2, 2, 2], arr4.tolist())
 

@@ -3,6 +3,10 @@
 import platform
 import sys
 from functools import lru_cache
+from typing import Final
+
+# https://github.com/cupy/cupy/blob/59e6c2b2e0c722b09c7a7af13f908942ef7806cc/cupy/cuda/memory.pyx#L805-L809
+ALLOCATION_UNIT_SIZE: Final[int] = 512
 
 
 class CompatibleError(RuntimeError):
@@ -50,6 +54,7 @@ def compatible_ipc() -> bool:
     if not has_cupy():
         raise CompatibleError("The cupy package is required")
 
+    # noinspection PyUnresolvedReferences
     import cupy
 
     num_devices = cupy.cuda.runtime.getDeviceCount()
@@ -61,14 +66,14 @@ def compatible_ipc() -> bool:
 
         major = props["major"]
         minor = props["minor"]
-        computeCapability = major, minor
-        if computeCapability < (2, 0):
+        compute_capability = major, minor
+        if compute_capability < (2, 0):
             raise CompatibleError(
                 f"Computing capability must be 2.0 or higher in Device({i})"
             )
 
-        deviceOverlap = props["deviceOverlap"]
-        if not deviceOverlap:
+        device_overlap = props["deviceOverlap"]
+        if not device_overlap:
             raise CompatibleError(f"Unsupported deviceOverlap in Device({i})")
 
     return True
