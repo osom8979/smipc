@@ -1,85 +1,141 @@
 # -*- coding: utf-8 -*-
 
-from struct import pack, unpack, unpack_from
+from functools import lru_cache
+from struct import calcsize, pack, unpack_from
 from typing import Final, Optional, Sequence
 
-LEN_SHAPE_OFFSET: Final[int] = 20
+BYTE_ORDER: Final[str] = "@"
+# @ = native byte order
+
+# noinspection SpellCheckingInspection
+HEADER_FMT: Final[str] = "IIIIII"
+# |.....................| ^      | I =  0 ~ 4 byte unsigned int = device_index
+# |.....................|  ^     | I =  4 ~ 4 byte unsigned int = len(event_handle)
+# |.....................|   ^    | I =  8 ~ 4 byte unsigned int = len(memory_handle)
+# |.....................|    ^   | I = 12 ~ 4 byte unsigned int = len(shape)
+# |.....................|     ^  | I = 16 ~ 4 byte unsigned int = stride
+# |.....................|      ^ | I = 20 ~ 4 byte unsigned int = memory size
+
+
+def header_fmt(byte_order=True) -> str:
+    return f"{BYTE_ORDER}{HEADER_FMT}" if byte_order else HEADER_FMT
+
+
+@lru_cache()
+def header_bytes() -> int:
+    return calcsize(header_fmt(byte_order=True))
+
+
+def data_fmt(
+    len_event_handle: int,
+    len_memory_handle: int,
+    len_shape: int,
+    byte_order=True,
+) -> str:
+    fmt = f"{len_event_handle}s{len_memory_handle}s{len_shape}I"
+    return f"{BYTE_ORDER}{fmt}" if byte_order else fmt
+
+
+def pack_fmt(
+    len_event_handle: int,
+    len_memory_handle: int,
+    len_shape: int,
+    byte_order=True,
+) -> str:
+    header = header_fmt(byte_order=False)
+    data = data_fmt(len_event_handle, len_memory_handle, len_shape, byte_order=False)
+    fmt = f"{header}{data}"
+    return f"{BYTE_ORDER}{fmt}" if byte_order else fmt
+
+
+DEVICE_INDEX_OFFSET: Final[int] = 0
+LEN_EVENT_HANDLE_OFFSET: Final[int] = 4
+LEN_MEMORY_HANDLE_OFFSET: Final[int] = 8
+LEN_SHAPE_OFFSET: Final[int] = 12
+MEMORY_SIZE_OFFSET: Final[int] = 16
+STRIDE_OFFSET: Final[int] = 20
+DATA_OFFSET: Final[int] = 24
 
 
 class CudaMemory:
     device_index: int
-    device_memory_ptr: int
-    device_event_ptr: int
+    event_handle: bytes
+    memory_handle: bytes
+    shape: Sequence[int]
     memory_size: int
     stride: int
-    shape: Sequence[int]
 
     def __init__(
         self,
         device_index: int,
-        device_memory_ptr: int,
-        device_event_ptr: int,
+        event_handle: bytes,
+        memory_handle: bytes,
         memory_size: int,
-        stride: Optional[int] = None,
+        stride=0,
         shape: Optional[Sequence[int]] = None,
     ):
         self.device_index = device_index
-        self.device_memory_ptr = device_memory_ptr
-        self.device_event_ptr = device_event_ptr
-        self.memory_size = memory_size
-        self.stride = stride if stride is not None else 0
+        self.event_handle = event_handle
+        self.memory_handle = memory_handle
         self.shape = tuple(shape if shape is not None else ())
-
-    @staticmethod
-    def pack_fmt(len_shape: int) -> str:
-        # noinspection SpellCheckingInspection
-        return f"@IIIIII{len_shape}I"
-        # |....| ^       | @ = native byte order
-        # |....|  ^      | I =  0 ~ 4 byte unsigned int = device_index
-        # |....|   ^     | I =  4 ~ 4 byte unsigned int = device_memory_ptr
-        # |....|    ^    | I =  8 ~ 4 byte unsigned int = device_event_ptr
-        # |....|     ^   | I = 12 ~ 4 byte unsigned int = memory_size
-        # |....|      ^  | I = 16 ~ 4 byte unsigned int = stride
-        # |....|       ^ | I = 20 ~ 4 byte unsigned int = len(shape)
-
-    @staticmethod
-    def unpack_len_shape(data: bytes) -> int:
-        return unpack_from("@I", data, 20)[0]
+        self.memory_size = memory_size
+        self.stride = stride
 
     def to_bytes(self) -> bytes:
+        fmt = pack_fmt(
+            len_event_handle=len(self.event_handle),
+            len_memory_handle=len(self.memory_handle),
+            len_shape=len(self.shape),
+            byte_order=True,
+        )
+
         # noinspection SpellCheckingInspection
         return pack(
-            self.pack_fmt(len(self.shape)),
+            fmt,
             self.device_index,
-            self.device_memory_ptr,
-            self.device_event_ptr,
+            len(self.event_handle),
+            len(self.memory_handle),
+            len(self.shape),
             self.memory_size,
             self.stride,
-            len(self.shape),
+            self.event_handle,
+            self.memory_handle,
             *self.shape,
         )
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        len_shape = unpack_from("@I", data, LEN_SHAPE_OFFSET)[0]
-        fmt = cls.pack_fmt(len_shape)
+        header_props = unpack_from(header_fmt(byte_order=True), data)
+        assert isinstance(header_props, tuple)
+        assert len(header_props) == 6
 
-        props = unpack(fmt, data)
-        assert isinstance(props, tuple)
-        assert len(props) == 6 + len_shape
+        device_index = header_props[0]
+        len_event_handle = header_props[1]
+        len_memory_handle = header_props[2]
+        len_shape = header_props[3]
+        memory_size = header_props[4]
+        stride = header_props[5]
 
-        device_index = props[0]
-        device_memory_ptr = props[1]
-        device_event_ptr = props[2]
-        memory_size = props[3]
-        stride = props[4]
-        assert len_shape == props[5]
-        shape = props[6:]
+        fmt = data_fmt(len_event_handle, len_memory_handle, len_shape, byte_order=True)
+        data_props = unpack_from(fmt, data, offset=DATA_OFFSET)
+        assert isinstance(data_props, tuple)
+        assert len(data_props) == 2 + len_shape
+
+        event_handle = data_props[0]
+        memory_handle = data_props[1]
+        shape = data_props[2:]
+
+        assert isinstance(event_handle, bytes)
+        assert len(event_handle) == len_event_handle
+        assert isinstance(memory_handle, bytes)
+        assert len(memory_handle) == len_memory_handle
+        assert isinstance(shape, tuple)
+        assert len(shape) == len_shape
 
         return cls(
             device_index,
-            device_memory_ptr,
-            device_event_ptr,
+            event_handle,
+            memory_handle,
             memory_size,
             stride,
             shape,
@@ -89,9 +145,9 @@ class CudaMemory:
         return (
             isinstance(other, CudaMemory)
             and self.device_index == other.device_index
-            and self.device_memory_ptr == other.device_memory_ptr
-            and self.device_event_ptr == other.device_event_ptr
+            and self.memory_handle == other.memory_handle
+            and self.event_handle == other.event_handle
+            and self.shape == other.shape
             and self.memory_size == other.memory_size
             and self.stride == other.stride
-            and self.shape == other.shape
         )
