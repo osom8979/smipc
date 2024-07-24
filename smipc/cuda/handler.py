@@ -1,59 +1,79 @@
 # -*- coding: utf-8 -*-
 
-from typing import Optional
+from typing import Optional, Sequence
+
+import numpy as np
 
 from smipc.cuda.memory import CudaMemory
 
 try:
-    import cupy
+    # noinspection PyUnresolvedReferences
+    import cupy as cp
 except ImportError:
     pass
 
 
 def get_device_count():
-    return cupy.cuda.runtime.getDeviceCount()
+    return cp.cuda.runtime.getDeviceCount()
 
 
 def get_device_properties(device_index: int):
-    return cupy.cuda.runtime.getDeviceProperties(device_index)
+    return cp.cuda.runtime.getDeviceProperties(device_index)
 
 
 def ipc_get_mem_handle(device_ptr: int):
-    return cupy.cuda.runtime.ipcGetMemHandle(device_ptr)
+    return cp.cuda.runtime.ipcGetMemHandle(device_ptr)
 
 
-def ipc_open_mem_handle(handle, flags: Optional[int] = None):
+def ipc_open_mem_handle(handle: bytes, flags: Optional[int] = None):
     if flags is None:
-        flags = cupy.cuda.runtime.cudaIpcMemLazyEnablePeerAccess
+        flags = cp.cuda.runtime.cudaIpcMemLazyEnablePeerAccess
     assert isinstance(flags, int)
-    return cupy.cuda.runtime.ipcOpenMemHandle(handle, flags)
+    return cp.cuda.runtime.ipcOpenMemHandle(handle, flags)
 
 
 def ipc_close_mem_handle(device_ptr: int):
-    return cupy.cuda.runtime.ipcCloseMemHandle(device_ptr)
+    return cp.cuda.runtime.ipcCloseMemHandle(device_ptr)
 
 
 def ipc_get_event_handle(event: int):
-    return cupy.cuda.runtime.ipcGetEventHandle(event)
+    return cp.cuda.runtime.ipcGetEventHandle(event)
 
 
-def ipc_open_event_handle(handle):
-    return cupy.cuda.runtime.ipcOpenEventHandle(handle)
-
-
-def alloc_pinned_array(size: int):
-    return cupy.cuda.alloc_pinned_memory(size)
+def ipc_open_event_handle(handle: bytes):
+    return cp.cuda.runtime.ipcOpenEventHandle(handle)
 
 
 class CudaHandler:
     _mem: Optional[CudaMemory]
 
-    def __init__(self, mem: Optional[CudaMemory] = None):
-        self._mem = mem
+    def __init__(self, size: int, device=None):
+        if size <= 0:
+            raise ValueError("size must be positive")
 
-    @property
-    def memory(self):
-        return self._mem
+        self._mem = None
+        self._size = size
+
+        self._device = cp.cuda.Device(device=device)
+        self._event = cp.cuda.Event(block=False, disable_timing=True, interprocess=True)
+
+        with self._device:
+            self._cpu = self.cpu_memory_pool().malloc(size)
+            self._gpu = self.gpu_memory_pool().malloc(size)
+
+    @staticmethod
+    def cpu_memory_pool():
+        return cp.get_default_pinned_memory_pool()
+
+    @staticmethod
+    def gpu_memory_pool():
+        return cp.get_default_memory_pool()
+
+    def as_numpy(self, shape: Sequence[int], dtype):
+        return np.frombuffer(self._cpu, dtype=dtype).reshape(shape)
+
+    def as_cupy(self, shape: Sequence[int], dtype):
+        return cp.ndarray(shape, dtype=dtype, memptr=self._gpu)
 
     def create_ipc(self):
         pass
