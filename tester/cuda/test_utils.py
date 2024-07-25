@@ -12,7 +12,23 @@ from smipc.cuda.utils import (
 
 class UtilsTestCase(TestCase):
     def test_align_ipc_malloc_size(self):
-        self.assertEqual(IPC_ALLOCATION_UNIT_SIZE, align_ipc_malloc_size(1))
+        with self.assertRaises(ValueError):
+            align_ipc_malloc_size(-1)
+        with self.assertRaises(ValueError):
+            align_ipc_malloc_size(0)
+
+        self.assertEqual(
+            IPC_ALLOCATION_UNIT_SIZE,
+            align_ipc_malloc_size(1),
+        )
+        self.assertEqual(
+            IPC_ALLOCATION_UNIT_SIZE,
+            align_ipc_malloc_size(IPC_ALLOCATION_UNIT_SIZE),
+        )
+        self.assertEqual(
+            IPC_ALLOCATION_UNIT_SIZE * 2,
+            align_ipc_malloc_size(IPC_ALLOCATION_UNIT_SIZE + 1),
+        )
 
     @skipIf(not has_cupy(), "The cupy package is required for the CudaHandler")
     def test_compatible_ipc(self):

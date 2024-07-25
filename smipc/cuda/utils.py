@@ -31,6 +31,11 @@ class CompatibleError(RuntimeError):
 
 
 def align_malloc_size(size: int, alignment: int) -> int:
+    if size <= 0:
+        raise ValueError("'size' must be positive")
+    if alignment <= 0:
+        raise ValueError("'alignment' must be positive")
+
     if size % alignment == 0:
         return size
     else:
