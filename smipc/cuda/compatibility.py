@@ -18,16 +18,6 @@ class CompatibleError(RuntimeError):
 
 
 @lru_cache
-def has_numpy() -> bool:
-    try:
-        import numpy  # noqa
-    except ImportError:
-        return False
-    else:
-        return True
-
-
-@lru_cache
 def has_cupy() -> bool:
     try:
         import cupy  # noqa

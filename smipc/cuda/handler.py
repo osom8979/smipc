@@ -2,13 +2,10 @@
 
 from typing import Optional, Sequence
 
+import numpy
+
 from smipc.cuda.alignment import IPC_ALLOCATION_UNIT_SIZE, align_ipc_malloc_size
 from smipc.cuda.memory import CudaMemory
-
-try:
-    import numpy  # noqa
-except ImportError:
-    pass
 
 try:
     import cupy  # noqa

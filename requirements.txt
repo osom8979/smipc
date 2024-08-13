@@ -2,6 +2,4 @@
 -r requirements.develop.txt
 -r requirements.main.txt
 -r requirements.test.txt
-overrides>=7.7.0
 uvloop
-numpy

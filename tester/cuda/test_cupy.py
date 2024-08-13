@@ -4,13 +4,10 @@ from gc import collect
 from unittest import TestCase, main, skipIf
 
 from smipc.cuda.alignment import ALLOCATION_UNIT_SIZE
-from smipc.cuda.compatibility import has_cupy, has_numpy
+from smipc.cuda.compatibility import has_cupy
 
 
-@skipIf(
-    not has_cupy() or not has_numpy(),
-    "The 'cupy' and 'numpy' package is required for the CudaHandler",
-)
+@skipIf(not has_cupy(), "The cupy package is required for the CudaHandler")
 class CupyTestCase(TestCase):
     def setUp(self):
         # noinspection PyUnresolvedReferences
