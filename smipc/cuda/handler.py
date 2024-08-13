@@ -2,8 +2,8 @@
 
 from typing import Optional, Sequence
 
+from smipc.cuda.alignment import IPC_ALLOCATION_UNIT_SIZE, align_ipc_malloc_size
 from smipc.cuda.memory import CudaMemory
-from smipc.cuda.utils import IPC_ALLOCATION_UNIT_SIZE, align_ipc_malloc_size
 
 try:
     import numpy  # noqa

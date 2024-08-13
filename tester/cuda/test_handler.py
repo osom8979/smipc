@@ -2,8 +2,9 @@
 
 from unittest import TestCase, main, skipIf
 
+from smipc.cuda.alignment import IPC_ALLOCATION_UNIT_SIZE
 from smipc.cuda.handler import CudaHandler
-from smipc.cuda.utils import IPC_ALLOCATION_UNIT_SIZE, has_cupy
+from smipc.cuda.utils import has_cupy
 
 
 @skipIf(not has_cupy(), "The cupy package is required for the CudaHandler")
