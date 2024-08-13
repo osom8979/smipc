@@ -19,6 +19,14 @@ except ImportError:
     pass
 
 
+def cupy_zeros(shape, dtype):
+    return cupy.zeros(shape, dtype=dtype)
+
+
+def cupy_ones(shape, dtype):
+    return cupy.ones(shape, dtype=dtype)
+
+
 def get_device_count():
     return cupy.cuda.runtime.getDeviceCount()
 
@@ -152,6 +160,10 @@ class CudaHandler:
         return cupy.get_default_memory_pool()
 
     @property
+    def device(self):
+        return self._device
+
+    @property
     def device_id(self):
         return self._device.id
 
@@ -166,6 +178,18 @@ class CudaHandler:
     @property
     def gpu(self):
         return self._gpu
+
+    @property
+    def event(self):
+        return self._event
+
+    @property
+    def stream(self):
+        return self._stream
+
+    @property
+    def mem(self):
+        return self._mem
 
     @property
     def size(self):
@@ -183,16 +207,16 @@ class CudaHandler:
 
     def copy_async_host_to_device(self) -> None:
         memcpy_async_host_to_device(
-            self._gpu_memory.data,
-            self._cpu_memory.data,
+            self._gpu_memory.ptr,
+            self._cpu_memory.ptr,
             self._size,
             self._stream.ptr,
         )
 
     def copy_async_device_to_host(self) -> None:
         memcpy_async_device_to_host(
-            self._cpu_memory.data,
-            self._gpu_memory.data,
+            self._cpu_memory.ptr,
+            self._gpu_memory.ptr,
             self._size,
             self._stream.ptr,
         )
