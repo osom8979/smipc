@@ -29,13 +29,13 @@ class HandlerTestCase(TestCase):
         handler.cpu[:] = cpu_ones[:]
         self.assertTrue(numpy.all(handler.cpu == 1))
 
-        handler.copy_async_host_to_device()
+        handler.async_copy_host_to_device()
 
         gpu = handler.gpu
         with handler.stream:
             gpu *= 10
 
-        handler.copy_async_device_to_host()
+        handler.async_copy_device_to_host()
         handler.record()
         handler.synchronize()
 

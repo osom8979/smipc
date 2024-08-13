@@ -27,6 +27,14 @@ def cupy_ones(shape, dtype):
     return cupy.ones(shape, dtype=dtype)
 
 
+def cpu_memory_pool():
+    return cupy.get_default_pinned_memory_pool()
+
+
+def gpu_memory_pool():
+    return cupy.get_default_memory_pool()
+
+
 def get_device_count():
     return cupy.cuda.runtime.getDeviceCount()
 
@@ -119,6 +127,7 @@ class CudaHandler:
         assert self._size % IPC_ALLOCATION_UNIT_SIZE == 0
 
         self._device = cupy.cuda.Device(device=device)
+        self._stream = cupy.cuda.Stream(non_blocking=True)
         self._event = cupy.cuda.Event(
             block=False,
             disable_timing=True,
@@ -126,18 +135,11 @@ class CudaHandler:
         )
 
         with self._device:
-            self._cpu_memory = self.cpu_memory_pool().malloc(self._size)
-            self._gpu_memory = self.gpu_memory_pool().malloc(self._size)
+            self._cpu_memory = cpu_memory_pool().malloc(self._size)
+            self._gpu_memory = gpu_memory_pool().malloc(self._size)
 
         self._cpu = numpy.ndarray(shape=shape, dtype=dtype, buffer=self._cpu_memory)  # type: ignore[var-annotated] # noqa E501
         self._gpu = cupy.ndarray(shape=shape, dtype=dtype, memptr=self._gpu_memory)
-
-        self._event = cupy.cuda.Event(
-            block=False,
-            disable_timing=True,
-            interprocess=True,
-        )
-        self._stream = cupy.cuda.Stream(non_blocking=True)
 
         self._event_handle = ipc_get_event_handle(self._event.ptr)
         self._memory_handle = ipc_get_mem_handle(self._gpu.data.ptr)
@@ -150,14 +152,6 @@ class CudaHandler:
             self._stride,
             self._cpu.shape,
         )
-
-    @staticmethod
-    def cpu_memory_pool():
-        return cupy.get_default_pinned_memory_pool()
-
-    @staticmethod
-    def gpu_memory_pool():
-        return cupy.get_default_memory_pool()
 
     @property
     def device(self):
@@ -205,7 +199,7 @@ class CudaHandler:
     def as_gpu_tensor(self):
         return torch.as_tensor(self._gpu, device=self.device_name)
 
-    def copy_async_host_to_device(self) -> None:
+    def async_copy_host_to_device(self) -> None:
         memcpy_async_host_to_device(
             self._gpu_memory.ptr,
             self._cpu_memory.ptr,
@@ -213,7 +207,7 @@ class CudaHandler:
             self._stream.ptr,
         )
 
-    def copy_async_device_to_host(self) -> None:
+    def async_copy_device_to_host(self) -> None:
         memcpy_async_device_to_host(
             self._cpu_memory.ptr,
             self._gpu_memory.ptr,
@@ -224,5 +218,5 @@ class CudaHandler:
     def record(self) -> None:
         self._event.record(self._stream)
 
-    def synchronize(self):
+    def synchronize(self) -> None:
         self._stream.synchronize()
