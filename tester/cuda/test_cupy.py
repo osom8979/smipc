@@ -4,7 +4,7 @@ from gc import collect
 from unittest import TestCase, main, skipIf
 
 from smipc.cuda.alignment import ALLOCATION_UNIT_SIZE
-from smipc.cuda.utils import has_cupy, has_numpy
+from smipc.cuda.compatibility import has_cupy, has_numpy
 
 
 @skipIf(
