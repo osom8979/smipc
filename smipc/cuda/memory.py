@@ -2,19 +2,66 @@
 
 from functools import lru_cache
 from struct import calcsize, pack, unpack_from
-from typing import Final, Optional, Sequence
+from typing import Any, Dict, Final, Optional, Sequence
+
+import numpy as np
 
 BYTE_ORDER: Final[str] = "@"
 # @ = native byte order
 
 # noinspection SpellCheckingInspection
-HEADER_FMT: Final[str] = "IIIIII"
-# |.....................| ^      | I =  0 ~ 4 byte unsigned int = device_index
-# |.....................|  ^     | I =  4 ~ 4 byte unsigned int = len(event_handle)
-# |.....................|   ^    | I =  8 ~ 4 byte unsigned int = len(memory_handle)
-# |.....................|    ^   | I = 12 ~ 4 byte unsigned int = len(shape)
-# |.....................|     ^  | I = 16 ~ 4 byte unsigned int = stride
-# |.....................|      ^ | I = 20 ~ 4 byte unsigned int = memory size
+HEADER_FMT: Final[str] = "IIIIIII"
+# |.....................| ^       | I =  0 ~ 4 byte unsigned int = device_index
+# |.....................|  ^      | I =  4 ~ 4 byte unsigned int = len(event_handle)
+# |.....................|   ^     | I =  8 ~ 4 byte unsigned int = len(memory_handle)
+# |.....................|    ^    | I = 12 ~ 4 byte unsigned int = len(shape)
+# |.....................|     ^   | I = 16 ~ 4 byte unsigned int = stride
+# |.....................|      ^  | I = 20 ~ 4 byte unsigned int = memory size
+# |.....................|       ^ | I = 24 ~ 4 byte unsigned int = dtype
+
+DEVICE_INDEX_OFFSET: Final[int] = 0
+LEN_EVENT_HANDLE_OFFSET: Final[int] = 4
+LEN_MEMORY_HANDLE_OFFSET: Final[int] = 8
+LEN_SHAPE_OFFSET: Final[int] = 12
+STRIDE_OFFSET: Final[int] = 16
+MEMORY_SIZE_OFFSET: Final[int] = 20
+DTYPE_OFFSET: Final[int] = 24
+DATA_OFFSET: Final[int] = 28
+
+DTYPE_TO_DINDEX: Final[Dict[Any, int]] = {
+    # --------------------
+    np.uint8: 8,
+    np.uint16: 16,
+    np.uint32: 32,
+    np.uint64: 64,
+    # np.uint128: 128,
+    # np.uint256: 256,
+    # --------------------
+    np.int8: 1008,
+    np.int16: 1016,
+    np.int32: 1032,
+    np.int64: 1064,
+    # np.int128: 1128,
+    # np.int256: 1256,
+    # --------------------
+    np.float16: 2016,
+    np.float32: 2032,
+    np.float64: 2064,
+    # np.float80: 2080,
+    # np.float96: 2096,
+    # np.float128: 2128,
+    # np.float256: 2256,
+    # --------------------
+    # np.complex64: 3064,
+    # np.complex128: 3128,
+    # np.complex160: 3160,
+    # np.complex192: 3192,
+    # np.complex256: 3256,
+    # np.complex512: 3512,
+    # --------------------
+}
+
+DINDEX_TO_DTYPE: Final[Dict[int, Any]] = {v: k for k, v in DTYPE_TO_DINDEX.items()}
 
 
 def header_fmt(byte_order=True) -> str:
@@ -24,6 +71,18 @@ def header_fmt(byte_order=True) -> str:
 @lru_cache()
 def header_bytes() -> int:
     return calcsize(header_fmt(byte_order=True))
+
+
+def serialize_dtype(dtype) -> int:
+    if isinstance(dtype, int):
+        return dtype
+    return DTYPE_TO_DINDEX[dtype]
+
+
+def deserialize_dtype(dtype):
+    if not isinstance(dtype, int):
+        raise TypeError("'dtype' must be an integer")
+    return DINDEX_TO_DTYPE[dtype]
 
 
 def data_fmt(
@@ -48,21 +107,13 @@ def pack_fmt(
     return f"{BYTE_ORDER}{fmt}" if byte_order else fmt
 
 
-DEVICE_INDEX_OFFSET: Final[int] = 0
-LEN_EVENT_HANDLE_OFFSET: Final[int] = 4
-LEN_MEMORY_HANDLE_OFFSET: Final[int] = 8
-LEN_SHAPE_OFFSET: Final[int] = 12
-MEMORY_SIZE_OFFSET: Final[int] = 16
-STRIDE_OFFSET: Final[int] = 20
-DATA_OFFSET: Final[int] = 24
-
-
 class CudaMemory:
     device_index: int
     event_handle: bytes
     memory_handle: bytes
     shape: Sequence[int]
     memory_size: int
+    dtype: int
     stride: int
 
     def __init__(
@@ -71,6 +122,7 @@ class CudaMemory:
         event_handle: bytes,
         memory_handle: bytes,
         memory_size: int,
+        dtype: Any,
         stride=0,
         shape: Optional[Sequence[int]] = None,
     ):
@@ -79,6 +131,7 @@ class CudaMemory:
         self.memory_handle = memory_handle
         self.shape = tuple(shape if shape is not None else ())
         self.memory_size = memory_size
+        self.dtype = serialize_dtype(dtype)
         self.stride = stride
 
     def to_bytes(self) -> bytes:
@@ -97,6 +150,7 @@ class CudaMemory:
             len(self.memory_handle),
             len(self.shape),
             self.memory_size,
+            self.dtype,
             self.stride,
             self.event_handle,
             self.memory_handle,
@@ -107,14 +161,15 @@ class CudaMemory:
     def from_bytes(cls, data: bytes):
         header_props = unpack_from(header_fmt(byte_order=True), data)
         assert isinstance(header_props, tuple)
-        assert len(header_props) == 6
+        assert len(header_props) == 7
 
         device_index = header_props[0]
         len_event_handle = header_props[1]
         len_memory_handle = header_props[2]
         len_shape = header_props[3]
         memory_size = header_props[4]
-        stride = header_props[5]
+        dtype = header_props[5]
+        stride = header_props[6]
 
         fmt = data_fmt(len_event_handle, len_memory_handle, len_shape, byte_order=True)
         data_props = unpack_from(fmt, data, offset=DATA_OFFSET)
@@ -137,6 +192,7 @@ class CudaMemory:
             event_handle,
             memory_handle,
             memory_size,
+            dtype,
             stride,
             shape,
         )
@@ -149,5 +205,6 @@ class CudaMemory:
             and self.event_handle == other.event_handle
             and self.shape == other.shape
             and self.memory_size == other.memory_size
+            and self.dtype == other.dtype
             and self.stride == other.stride
         )

@@ -149,6 +149,7 @@ class CudaHandler:
             self._event_handle,
             self._memory_handle,
             self._size,
+            dtype,
             self._stride,
             self._cpu.shape,
         )

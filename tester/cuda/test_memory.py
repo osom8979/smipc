@@ -2,13 +2,15 @@
 
 from unittest import TestCase, main
 
+import numpy as np
+
 from smipc.cuda.memory import CudaMemory, header_bytes
 
 
 class MemoryTestCase(TestCase):
     def test_header(self):
-        # Header size: UINT(4byte) * 6 = 24bytes
-        self.assertEqual(24, header_bytes())
+        # Header size: UINT(4byte) * 7 = 28bytes
+        self.assertEqual(28, header_bytes())
 
     def test_default(self):
         device_index = 2
@@ -17,12 +19,14 @@ class MemoryTestCase(TestCase):
         memory_size = 100
         stride = 4
         shape = [10, 11, 12]
+        dtype = np.uint8
 
         mem1 = CudaMemory(
             device_index,
             event_handle,
             memory_handle,
             memory_size,
+            dtype,
             stride,
             shape,
         )
