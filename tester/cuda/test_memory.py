@@ -4,7 +4,7 @@ from unittest import TestCase, main
 
 import numpy as np
 
-from smipc.cuda.memory import CudaMemory, header_bytes
+from smipc.cuda.packet import CudaIpcPacket, header_bytes
 
 
 class MemoryTestCase(TestCase):
@@ -21,7 +21,7 @@ class MemoryTestCase(TestCase):
         shape = [10, 11, 12]
         dtype = np.uint8
 
-        mem1 = CudaMemory(
+        mem1 = CudaIpcPacket(
             device_index,
             event_handle,
             memory_handle,
@@ -34,7 +34,7 @@ class MemoryTestCase(TestCase):
         serialized_data = mem1.to_bytes()
         self.assertIsInstance(serialized_data, bytes)
 
-        mem2 = CudaMemory.from_bytes(serialized_data)
+        mem2 = CudaIpcPacket.from_bytes(serialized_data)
         self.assertEqual(mem1, mem2)
 
         self.assertEqual(device_index, mem2.device_index)

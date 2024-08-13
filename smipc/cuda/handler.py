@@ -6,7 +6,7 @@ from typing import Optional, Sequence
 import numpy
 
 from smipc.cuda.alignment import IPC_ALLOCATION_UNIT_SIZE, align_ipc_malloc_size
-from smipc.cuda.memory import CudaMemory
+from smipc.cuda.packet import CudaIpcPacket
 
 try:
     import cupy  # noqa
@@ -87,7 +87,7 @@ def memcpy_async_device_to_host(dst: int, src: int, size: int, stream: int):
 
 
 class IpcReceiver:
-    def __init__(self, mem: CudaMemory):
+    def __init__(self, mem: CudaIpcPacket):
         self._shape = mem.shape
         self._memory_size = mem.memory_size
         self._stride = mem.stride
@@ -144,7 +144,7 @@ class CudaHandler:
         self._event_handle = ipc_get_event_handle(self._event.ptr)
         self._memory_handle = ipc_get_mem_handle(self._gpu.data.ptr)
 
-        self._mem = CudaMemory(
+        self._info = CudaIpcPacket(
             self._device.id,
             self._event_handle,
             self._memory_handle,
@@ -183,8 +183,8 @@ class CudaHandler:
         return self._stream
 
     @property
-    def mem(self):
-        return self._mem
+    def info(self):
+        return self._info
 
     @property
     def size(self):
