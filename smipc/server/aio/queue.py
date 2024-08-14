@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from asyncio import AbstractEventLoop, Queue
+from asyncio import Queue
 from typing import Optional
 from weakref import ReferenceType
 
@@ -21,17 +21,14 @@ class AioQueueChannel(AioChannel):
         weak_base: Optional[ReferenceType["BaseServer"]] = None,
         fifos: Optional[TemporaryPipePair] = None,
         maxsize=0,
-        loop: Optional[AbstractEventLoop] = None,
     ):
         super().__init__(
             key=key,
             proto=proto,
             weak_base=weak_base,
             fifos=fifos,
-            loop=loop,
         )
-        assert self._loop is not None
-        self._queue = Queue(maxsize=maxsize, loop=self._loop)
+        self._queue = Queue(maxsize)
 
     @override
     async def on_recv(self, data: bytes) -> None:

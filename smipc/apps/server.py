@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from asyncio import AbstractEventLoop, get_running_loop, sleep
+from asyncio import sleep
 from typing import Callable, Optional
 
 from smipc.aio.run import aio_run
@@ -17,9 +17,8 @@ class _AioEchoServer(AioEchoServer):
         root: str,
         use_cuda: bool,
         printer: Callable[..., None],
-        loop: AbstractEventLoop,
     ):
-        super().__init__(root=root, loop=loop)
+        super().__init__(root)
         self._use_cuda = use_cuda
         self._printer = printer
 
@@ -35,7 +34,7 @@ async def run_echo_server(
     use_cuda: bool,
     printer: Callable[..., None],
 ) -> None:
-    server = _AioEchoServer(root_dir, use_cuda, printer, get_running_loop())
+    server = _AioEchoServer(root_dir, use_cuda, printer)
     server.open(channel)
 
     while True:
