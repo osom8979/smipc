@@ -17,6 +17,12 @@ class CupyTestCase(TestCase):
         self.cp = _cp
         self.np = _np
 
+        gpu_pool = self.cp.get_default_memory_pool()
+        cpu_pool = self.cp.get_default_pinned_memory_pool()
+
+        gpu_pool.free_all_blocks()
+        cpu_pool.free_all_blocks()
+
     def test_pinned_memory_pool(self):
         cpu_pool = self.cp.get_default_pinned_memory_pool()
         self.assertEqual(0, cpu_pool.n_free_blocks())
