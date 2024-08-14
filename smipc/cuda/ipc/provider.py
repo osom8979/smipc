@@ -6,7 +6,7 @@ from typing import Sequence
 import numpy
 
 from smipc.cuda.alignment import IPC_ALLOCATION_UNIT_SIZE, align_ipc_malloc_size
-from smipc.cuda.packet import CudaIpcPacket
+from smipc.cuda.ipc.packet import CudaIpcPacket
 from smipc.cuda.runtime import (
     cpu_memory_pool,
     cupy_to_tensor,

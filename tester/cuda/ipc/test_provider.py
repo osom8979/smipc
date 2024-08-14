@@ -6,7 +6,7 @@ from unittest import TestCase, main, skipIf
 import numpy
 
 from smipc.cuda.compatibility import has_cupy
-from smipc.cuda.provider import CudaIpcProvider
+from smipc.cuda.ipc.provider import CudaIpcProvider
 from smipc.cuda.runtime import cupy_ones
 
 

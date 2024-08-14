@@ -4,7 +4,7 @@ from unittest import TestCase, main
 
 import numpy as np
 
-from smipc.cuda.packet import CudaIpcPacket, header_bytes
+from smipc.cuda.ipc.packet import CudaIpcPacket, header_bytes
 
 
 class PacketTestCase(TestCase):
