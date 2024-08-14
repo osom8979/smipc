@@ -12,10 +12,11 @@ from smipc.cuda.runtime import cupy_ones
 
 @skipIf(not has_cupy(), "The cupy package is required for the CudaHandler")
 class ProviderTestCase(TestCase):
-    def test_default(self):
+    def test_shape_error(self):
         with self.assertRaises(ValueError):
             CudaIpcProvider((0, 0), dtype=numpy.uint8)
 
+    def test_default(self):
         shape = 1920 * 2, 1080 * 2, 3
         size = reduce(lambda x, y: x * y, shape, 1)
 
