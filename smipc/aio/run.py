@@ -1,7 +1,18 @@
 # -*- coding: utf-8 -*-
 
 from asyncio import run as asyncio_run
+from functools import lru_cache
 from sys import version_info
+
+
+@lru_cache
+def has_uvloop() -> bool:
+    try:
+        import uvloop  # noqa
+    except ImportError:
+        return False
+    else:
+        return True
 
 
 def uv_run(coro) -> None:

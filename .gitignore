@@ -134,3 +134,4 @@ MANIFEST
 ###############
 ### Project ###
 .venv/
+.pipe/
