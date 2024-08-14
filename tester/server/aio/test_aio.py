@@ -11,7 +11,7 @@ from weakref import ReferenceType
 from smipc.decorators.override import override
 from smipc.pipe.temp_pair import TemporaryPipePair
 from smipc.protocols.sm import SmProtocol
-from smipc.server.aio import AioChannel, AioServer
+from smipc.server.aio.base import AioChannel, AioServer
 
 
 class _TestAioChannel(AioChannel):

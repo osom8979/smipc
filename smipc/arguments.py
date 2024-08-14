@@ -24,7 +24,8 @@ Simply usage:
 
 CMDS: Final[Sequence[str]] = CMD_SERVER, CMD_CLIENT
 
-LOCAL_PIPE_DIR: Final[str] = ".pipe"
+DEFAULT_CHANNEL: Final[str] = "0"
+LOCAL_ROOT_DIR: Final[str] = "pipe"
 DEFAULT_ITERATION: Final[int] = 1_000
 DEFAULT_DATA_SIZE: Final[int] = 1920 * 1080 * 3  # FHD rgb24 image
 
@@ -57,21 +58,6 @@ def add_client_parser(subparsers) -> None:
         epilog=CMD_CLIENT_EPILOG,
     )
     assert isinstance(parser, ArgumentParser)
-
-
-def default_argument_parser() -> ArgumentParser:
-    parser = ArgumentParser(
-        prog=PROG,
-        description=DESCRIPTION,
-        formatter_class=RawDescriptionHelpFormatter,
-    )
-
-    parser.add_argument(
-        "--pipe-dir",
-        metavar="dir",
-        default=os.path.join(os.getcwd(), LOCAL_PIPE_DIR),
-        help="The directory location where the pipe file will be created",
-    )
     parser.add_argument(
         "--iteration",
         "-i",
@@ -85,6 +71,26 @@ def default_argument_parser() -> ArgumentParser:
         default=DEFAULT_DATA_SIZE,
         help=f"Size of test data to use for handshake (default: {DEFAULT_DATA_SIZE})",
     )
+
+
+def default_argument_parser() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog=PROG,
+        description=DESCRIPTION,
+        formatter_class=RawDescriptionHelpFormatter,
+    )
+
+    parser.add_argument(
+        "--root-dir",
+        metavar="dir",
+        default=os.path.join(os.getcwd(), LOCAL_ROOT_DIR),
+        help="The directory location where the pipe file will be created",
+    )
+    parser.add_argument(
+        "--channel",
+        default=DEFAULT_CHANNEL,
+        help="Channel name",
+    )
     parser.add_argument(
         "--use-cuda",
         action="store_true",
@@ -96,13 +102,6 @@ def default_argument_parser() -> ArgumentParser:
         action="store_true",
         default=False,
         help="Replace the event loop with uvloop",
-    )
-    parser.add_argument(
-        "--debug",
-        "-d",
-        action="store_true",
-        default=False,
-        help="Enable debugging mode",
     )
     parser.add_argument(
         "--version",
