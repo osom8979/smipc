@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from functools import reduce
-from multiprocessing import Process, SimpleQueue
+from multiprocessing import Process, SimpleQueue, set_start_method
 from unittest import TestCase, main, skipIf
 
 import numpy
@@ -38,6 +38,8 @@ def _receiver_main(queue: SimpleQueue):
 @skipIf(not has_cupy(), "The cupy package is required for the CudaHandler")
 class CommunicationTestCase(TestCase):
     def test_default(self):
+        set_start_method("spawn", force=True)
+
         shape = 1920 * 2, 1080 * 2, 3
         size = reduce(lambda x, y: x * y, shape, 1)
         dtype = numpy.uint8
@@ -50,7 +52,7 @@ class CommunicationTestCase(TestCase):
 
         provider = CudaIpcProvider(shape, dtype=dtype)
 
-        queue = SimpleQueue[bytes]()
+        queue = SimpleQueue()
         receiver_proc = Process(target=_receiver_main, args=(queue,))
         receiver_proc.start()
 
