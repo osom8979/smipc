@@ -7,7 +7,7 @@ import numpy as np
 from smipc.cuda.packet import CudaIpcPacket, header_bytes
 
 
-class MemoryTestCase(TestCase):
+class PacketTestCase(TestCase):
     def test_header(self):
         # Header size: UINT(4byte) * 7 = 28bytes
         self.assertEqual(28, header_bytes())

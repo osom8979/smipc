@@ -127,29 +127,6 @@ class CupyTestCase(TestCase):
         self.assertEqual(0, gpu_pool.total_bytes())
         self.assertEqual(0, cpu_pool.n_free_blocks())
 
-    def test_stream(self):
-        # a_cpu = self.np.ones((10000, 10000), dtype=self.np.float32)
-        # b_cpu = self.np.ones((10000, 10000), dtype=self.np.float32)
-
-        # # np.ndarray with pinned memory
-        # a_cpu = pinned_array(a_cpu)
-        # b_cpu = pinned_array(b_cpu)
-
-        # a_stream = cp.cuda.Stream(non_blocking=True)
-        # b_stream = cp.cuda.Stream(non_blocking=True)
-
-        # a_gpu = cp.empty_like(a_cpu)
-        # b_gpu = cp.empty_like(b_cpu)
-
-        # a_gpu.set(a_cpu, stream=a_stream)
-        # b_gpu.set(b_cpu, stream=b_stream)
-
-        # # wait until a_cpu is copied in a_gpu
-        # a_stream.synchronize()
-        # # This line runs parallel to b_gpu.set()
-        # a_gpu *= 2
-        pass
-
 
 if __name__ == "__main__":
     main()

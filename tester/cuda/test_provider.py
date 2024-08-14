@@ -6,14 +6,15 @@ from unittest import TestCase, main, skipIf
 import numpy
 
 from smipc.cuda.compatibility import has_cupy
-from smipc.cuda.handler import CudaHandler, cupy_ones
+from smipc.cuda.provider import CudaIpcProvider
+from smipc.cuda.runtime import cupy_ones
 
 
 @skipIf(not has_cupy(), "The cupy package is required for the CudaHandler")
-class HandlerTestCase(TestCase):
+class ProviderTestCase(TestCase):
     def test_default(self):
         with self.assertRaises(ValueError):
-            CudaHandler((0, 0), dtype=numpy.uint8)
+            CudaIpcProvider((0, 0), dtype=numpy.uint8)
 
         shape = 1920 * 2, 1080 * 2, 3
         size = reduce(lambda x, y: x * y, shape, 1)
@@ -24,7 +25,7 @@ class HandlerTestCase(TestCase):
         gpu_ones = cupy_ones(shape, dtype=numpy.uint8)
         self.assertEqual(size, gpu_ones.size)
 
-        handler = CudaHandler(shape, dtype=numpy.uint8)
+        handler = CudaIpcProvider(shape, dtype=numpy.uint8)
 
         handler.cpu[:] = cpu_ones[:]
         self.assertTrue(numpy.all(handler.cpu == 1))
