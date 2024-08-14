@@ -40,19 +40,20 @@ class CudaIpcProvider:
         assert size % IPC_ALLOCATION_UNIT_SIZE == 0
 
         self._device = cupy.cuda.Device(device=device)
-        self._stream = cupy.cuda.Stream(non_blocking=True)
-        self._event = cupy.cuda.Event(
-            block=False,
-            disable_timing=True,
-            interprocess=True,
-        )
 
         with self._device:
+            self._stream = cupy.cuda.Stream(non_blocking=True)
+            self._event = cupy.cuda.Event(
+                block=False,
+                disable_timing=True,
+                interprocess=True,
+            )
+
             self._cpu_memory = cpu_memory_pool().malloc(size)
             self._gpu_memory = gpu_memory_pool().malloc(size)
 
-        self._cpu = numpy.ndarray(shape=shape, dtype=dtype, buffer=self._cpu_memory)
-        self._gpu = cupy.ndarray(shape=shape, dtype=dtype, memptr=self._gpu_memory)
+            self._cpu = numpy.ndarray(shape=shape, dtype=dtype, buffer=self._cpu_memory)
+            self._gpu = cupy.ndarray(shape=shape, dtype=dtype, memptr=self._gpu_memory)
 
         self._info = CudaIpcPacket(
             device_index=self._device.id,

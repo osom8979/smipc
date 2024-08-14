@@ -30,24 +30,27 @@ class CudaIpcReceiver:
     def __init__(self, info: CudaIpcPacket, lazy_cpu=True):
         self._info = info
         self._device = cupy.cuda.Device(device=info.device_index)
-        self._stream = cupy.cuda.get_current_stream(info.device_index)
-        self._event_ptr = ipc_open_event_handle(info.event_handle)
-        self._device_ptr = ipc_open_mem_handle(info.memory_handle)
 
-        self._cpu_memory = None
-        self._cpu = None
+        with self._device:
+            self._stream = cupy.cuda.get_current_stream(info.device_index)
+            self._event_ptr = ipc_open_event_handle(info.event_handle)
+            self._device_ptr = ipc_open_mem_handle(info.memory_handle)
 
-        if not lazy_cpu:
-            self.init_cpu()
+            self._cpu_memory = None
+            self._cpu = None
 
-        um = cupy.cuda.UnownedMemory(
-            ptr=self._device_ptr,
-            size=info.memory_size,
-            owner=0,
-            device_id=self._device.id,
-        )
-        mp = cupy.cuda.MemoryPointer(mem=um, offset=0)
-        self._gpu = cupy.ndarray(info.shape, dtype=info.dtype, memptr=mp)
+            if not lazy_cpu:
+                self.init_cpu()
+
+            um = cupy.cuda.UnownedMemory(
+                ptr=self._device_ptr,
+                size=info.memory_size,
+                owner=0,
+                device_id=self._device.id,
+            )
+            mp = cupy.cuda.MemoryPointer(mem=um, offset=0)
+
+            self._gpu = cupy.ndarray(info.shape, dtype=info.dtype, memptr=mp)
 
     def init_cpu(self):
         if self._cpu is not None:
