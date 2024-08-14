@@ -66,7 +66,7 @@ class CudaIpcPacket:
     memory_handle: bytes
     shape: Sequence[int]
     memory_size: int
-    dtype: int
+    dtype: Any
     stride: int
 
     def __init__(

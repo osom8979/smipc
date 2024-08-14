@@ -70,10 +70,18 @@ def ipc_open_event_handle(handle: bytes) -> int:
     return cupy.cuda.runtime.ipcOpenEventHandle(handle)
 
 
-def stream_wait_event(stream: int, event: int, flags=0):
+def event_record(event: int, stream: int) -> None:
+    return cupy.cuda.runtime.eventRecord(event, stream)
+
+
+def stream_wait_event(stream: int, event: int, flags=0) -> None:
     # cudaEventWaitDefault == 0
     # cudaEventWaitExternal == 1
     return cupy.cuda.runtime.streamWaitEvent(stream, event, flags)
+
+
+def stream_synchronize(stream: int) -> None:
+    return cupy.cuda.runtime.streamSynchronize(stream)
 
 
 def memcpy_async(dst: int, src: int, size: int, kind: int, stream: int):

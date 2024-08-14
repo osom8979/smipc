@@ -11,15 +11,11 @@ from smipc.cuda.runtime import (
     cpu_memory_pool,
     cupy_to_tensor,
     gpu_memory_pool,
-    ipc_close_mem_handle,
     ipc_get_event_handle,
     ipc_get_mem_handle,
-    ipc_open_event_handle,
-    ipc_open_mem_handle,
     memcpy_async_device_to_host,
     memcpy_async_host_to_device,
     numpy_to_tensor,
-    stream_wait_event,
 )
 
 try:
@@ -28,34 +24,9 @@ except ImportError:
     pass
 
 
-class IpcReceiver:
-    def __init__(self, mem: CudaIpcPacket):
-        self._shape = mem.shape
-        self._memory_size = mem.memory_size
-        self._stride = mem.stride
-
-        self._device_ptr = ipc_open_mem_handle(mem.memory_handle)
-        self._um = cupy.cuda.UnownedMemory(self._device_ptr, mem.memory_size, 0)
-        self._mp = cupy.cuda.MemoryPointer(self._um, 0)
-
-        self._device = cupy.cuda.Device(device=mem.device_index)
-        self._event_ptr = ipc_open_event_handle(mem.event_handle)
-        self._stream = cupy.cuda.get_current_stream(mem.device_index)
-
-    def close(self):
-        ipc_close_mem_handle(self._device_ptr)
-
-    def record(self):
-        cupy.cuda.runtime.eventRecord(self._event_ptr, self._stream.ptr)
-
-    def wait(self):
-        stream_wait_event(self._stream.ptr, self._event_ptr)
-
-    def as_gpu(self, dtype):
-        return cupy.ndarray(self._shape, dtype=dtype, memptr=self._mp)
-
-
 class CudaIpcProvider:
+    _cpu: numpy.ndarray
+
     def __init__(self, shape: Sequence[int], dtype, stride=0, device=None):
         if len(shape) <= 0:
             raise ValueError("'shape' cannot be empty")
@@ -80,7 +51,7 @@ class CudaIpcProvider:
             self._cpu_memory = cpu_memory_pool().malloc(size)
             self._gpu_memory = gpu_memory_pool().malloc(size)
 
-        self._cpu = numpy.ndarray(shape=shape, dtype=dtype, buffer=self._cpu_memory)  # type: ignore[var-annotated] # noqa E501
+        self._cpu = numpy.ndarray(shape=shape, dtype=dtype, buffer=self._cpu_memory)
         self._gpu = cupy.ndarray(shape=shape, dtype=dtype, memptr=self._gpu_memory)
 
         self._info = CudaIpcPacket(
@@ -155,8 +126,11 @@ class CudaIpcProvider:
             self._stream.ptr,
         )
 
-    def record(self) -> None:
+    def record(self):
         self._event.record(self._stream)
+
+    def wait_event(self):
+        self._stream.wait_event(self._event)
 
     def synchronize(self) -> None:
         self._stream.synchronize()
