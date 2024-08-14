@@ -47,6 +47,10 @@ def get_device_properties(device_index: int):
     return cupy.cuda.runtime.getDeviceProperties(device_index)
 
 
+def device_synchronize() -> None:
+    return cupy.cuda.runtime.deviceSynchronize()
+
+
 def ipc_get_mem_handle(device_ptr: int) -> bytes:
     return cupy.cuda.runtime.ipcGetMemHandle(device_ptr)
 
