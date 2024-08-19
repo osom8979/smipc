@@ -16,7 +16,7 @@ def run_server(
     key=DEFAULT_CHANNEL,
     iteration=DEFAULT_ITERATION,
     use_cuda=False,
-    use_cuda_kernel=False,
+    use_cuda_kernel=True,
     debug=False,
     verbose=0,
     printer: Callable[..., None] = print,
