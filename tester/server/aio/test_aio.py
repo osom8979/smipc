@@ -76,10 +76,11 @@ class AioTestCase(IsolatedAsyncioTestCase):
             client_buf1 = await client1.buffer.get()
             self.assertEqual(data1, client_buf1)
 
-            count = 10
+            count = 100
             total_duration = 0.0
+            drop_first = True
 
-            for _ in range(count):
+            for i in range(count):
                 begin = time()
                 self.assertEqual(len(data1), client1.send(data1).sm_byte)
 
@@ -90,9 +91,10 @@ class AioTestCase(IsolatedAsyncioTestCase):
                 self.assertEqual(data1, client_buf1)
 
                 duration = time() - begin
-                total_duration += duration
+                if not (drop_first and i == 0):
+                    total_duration += duration
 
-            mean_duration = total_duration / count
+            mean_duration = total_duration / (count - (1 if drop_first else 0))
             print(f"\nMean duration: {mean_duration:.3f}s (count={count})")
 
             client1.close()

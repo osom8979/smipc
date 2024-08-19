@@ -8,7 +8,19 @@ from weakref import ReferenceType
 from smipc.decorators.override import override
 from smipc.pipe.temp_pair import TemporaryPipePair
 from smipc.protocols.sm import SmProtocol
-from smipc.server.base import BaseServer, Channel
+from smipc.server.base import (
+    BaseServer,
+    Channel,
+    create_pipe,
+    create_proto,
+    get_path_pair,
+)
+from smipc.variables import (
+    CLIENT_TO_SERVER_SUFFIX,
+    DEFAULT_ENCODING,
+    INFINITY_QUEUE_SIZE,
+    SERVER_TO_CLIENT_SUFFIX,
+)
 
 
 def _aio_channel_reader(channel: "AioChannel") -> None:
@@ -68,6 +80,43 @@ class AioChannel(Channel, AioChannelInterface):
         pass
 
 
+class AioClient(AioChannel):
+    def __init__(self, key: str, proto: SmProtocol):
+        super().__init__(key, proto)
+
+    @classmethod
+    def from_channel(cls, channel: Channel):
+        if channel._weak_base is not None:
+            raise ValueError("The 'weak_base' attribute of the channel is already set")
+        if channel._fifos is not None:
+            raise ValueError("The 'fifos' attribute of the channel is already set")
+
+        return cls(channel.key, channel.proto)
+
+    @classmethod
+    def from_root(
+        cls,
+        root: str,
+        key: str,
+        blocking=False,
+        *,
+        encoding=DEFAULT_ENCODING,
+        max_queue=INFINITY_QUEUE_SIZE,
+        s2c_suffix=SERVER_TO_CLIENT_SUFFIX,
+        c2s_suffix=CLIENT_TO_SERVER_SUFFIX,
+    ):
+        paths = get_path_pair(
+            root=root,
+            key=key,
+            flip=True,
+            s2c_suffix=s2c_suffix,
+            c2s_suffix=c2s_suffix,
+        )
+        pipe = create_pipe(paths, blocking=blocking, no_faker=True)
+        proto = create_proto(pipe, encoding, max_queue)
+        return cls(key, proto)
+
+
 class AioServerInterface(ABC):
     @abstractmethod
     async def on_recv(self, channel: AioChannel, data: bytes) -> None:
@@ -88,9 +137,3 @@ class AioServer(BaseServer, AioServerInterface):
     @override
     async def on_recv(self, channel: AioChannel, data: bytes) -> None:
         pass
-
-    def create_synced_client_channel(self, key: str, blocking=False):
-        paths = self.get_path_pair(key, flip=True)
-        pipe = self.create_pipe(paths, blocking=blocking, no_faker=True)
-        proto = self.create_proto(pipe)
-        return BaseServer.on_create_channel(self, key, proto, None, None)
