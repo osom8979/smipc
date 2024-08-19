@@ -24,6 +24,7 @@ def main(
     assert args.cmd in CMDS
     assert isinstance(args.root_dir, str)
     assert isinstance(args.channel, str)
+    assert isinstance(args.iteration, int)
     assert isinstance(args.use_cuda, bool)
     assert isinstance(args.use_uvloop, bool)
     assert isinstance(args.debug, bool)
@@ -31,6 +32,7 @@ def main(
 
     root_dir = args.root_dir
     channel = args.channel
+    iteration = args.iteration
     use_cuda = args.use_cuda
     use_uvloop = args.use_uvloop
     debug = args.debug
@@ -60,22 +62,33 @@ def main(
         printer("The 'uvloop' package is not installed")
         return 1
 
-    iteration = 0
-    data_size = 0
+    if iteration <= 0:
+        printer("The 'iteration' argument is must be greater than 0")
+        return 1
+
+    frame_width = 0
+    frame_height = 0
+    frame_channels = 0
 
     if args.cmd == CMD_CLIENT:
-        assert isinstance(args.iteration, int)
-        assert isinstance(args.data_size, int)
+        assert isinstance(args.frame_width, int)
+        assert isinstance(args.frame_height, int)
+        assert isinstance(args.frame_channels, int)
 
-        iteration = args.iteration
-        data_size = args.data_size
+        frame_width = args.frame_width
+        frame_height = args.frame_height
+        frame_channels = args.frame_channels
 
-        if iteration <= 0:
-            printer("The 'iteration' argument is must be greater than 0")
+        if frame_width <= 0:
+            printer("The 'frame_width' argument is must be greater than 0")
             return 1
 
-        if data_size <= 0:
-            printer("The 'data-size' argument is must be greater than 0")
+        if frame_height <= 0:
+            printer("The 'frame_height' argument is must be greater than 0")
+            return 1
+
+        if frame_channels <= 0:
+            printer("The 'frame_channels' argument is must be greater than 0")
             return 1
 
     try:
@@ -83,6 +96,7 @@ def main(
             run_server(
                 root=root_dir,
                 key=channel,
+                iteration=iteration,
                 use_cuda=use_cuda,
                 debug=debug,
                 verbose=verbose,
@@ -93,7 +107,9 @@ def main(
                 root=root_dir,
                 key=channel,
                 iteration=iteration,
-                data_size=data_size,
+                frame_width=frame_width,
+                frame_height=frame_height,
+                frame_channels=frame_channels,
                 use_cuda=use_cuda,
                 debug=debug,
                 verbose=verbose,

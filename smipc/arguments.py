@@ -27,7 +27,10 @@ CMDS: Final[Sequence[str]] = CMD_SERVER, CMD_CLIENT
 DEFAULT_CHANNEL: Final[str] = "0"
 LOCAL_ROOT_DIR: Final[str] = "pipe"
 DEFAULT_ITERATION: Final[int] = 1_000
-DEFAULT_DATA_SIZE: Final[int] = 1920 * 1080 * 3  # FHD rgb24 image
+DEFAULT_FRAME_WIDTH: Final[int] = 1920
+DEFAULT_FRAME_HEIGHT: Final[int] = 1080
+DEFAULT_FRAME_CHANNELS: Final[int] = 3
+DEFAULT_DATA_SIZE = DEFAULT_FRAME_WIDTH * DEFAULT_FRAME_HEIGHT * DEFAULT_FRAME_CHANNELS
 
 
 @lru_cache
@@ -59,17 +62,22 @@ def add_client_parser(subparsers) -> None:
     )
     assert isinstance(parser, ArgumentParser)
     parser.add_argument(
-        "--iteration",
-        "-i",
+        "--frame-width",
         metavar="int",
-        default=DEFAULT_ITERATION,
-        help=f"Number of test repetitions (default: {DEFAULT_ITERATION})",
+        default=DEFAULT_FRAME_WIDTH,
+        help=f"Frame width (default: {DEFAULT_FRAME_WIDTH})",
     )
     parser.add_argument(
-        "--data-size",
-        metavar="bytes",
-        default=DEFAULT_DATA_SIZE,
-        help=f"Size of test data to use for handshake (default: {DEFAULT_DATA_SIZE})",
+        "--frame-height",
+        metavar="int",
+        default=DEFAULT_FRAME_HEIGHT,
+        help=f"Frame width (default: {DEFAULT_FRAME_HEIGHT})",
+    )
+    parser.add_argument(
+        "--frame-channels",
+        metavar="int",
+        default=DEFAULT_FRAME_CHANNELS,
+        help=f"Frame width (default: {DEFAULT_FRAME_CHANNELS})",
     )
 
 
@@ -92,6 +100,14 @@ def default_argument_parser() -> ArgumentParser:
         help="Channel name",
     )
     parser.add_argument(
+        "--iteration",
+        "-i",
+        metavar="int",
+        default=DEFAULT_ITERATION,
+        help=f"Number of test repetitions (default: {DEFAULT_ITERATION})",
+    )
+
+    parser.add_argument(
         "--use-cuda",
         action="store_true",
         default=False,
@@ -103,6 +119,7 @@ def default_argument_parser() -> ArgumentParser:
         default=False,
         help="Replace the event loop with uvloop",
     )
+
     parser.add_argument(
         "--debug",
         "-d",
