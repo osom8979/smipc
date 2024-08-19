@@ -6,6 +6,44 @@
 
 Shared Memory IPC
 
+## Motivation
+
+...
+
+## Features
+
+...
+
+## Benchmark Test
+
+CUDA IPC:
+```shell
+./run --use-cuda server
+# after
+./run --use-cuda client
+```
+
+CPU IPC:
+```shell
+./run server
+# after
+./run client
+```
+
+## Test Result
+
+Test environment:
+
+* CPU: Intel(R) Xeon(R) Silver 4208 CPU @ 2.10GHz
+* GPU: NVIDIA GeForce RTX 3070 Ti
+* Data size: 1920 * 1080 * 3 bytes (5.9MBytes)
+* Iteration count: 1000
+
+Test Results:
+
+* CPU IPC: 6ms ~ 7ms
+* CUDA IPC: 4ms ~ 5ms
+
 ## License
 
 See the [LICENSE](./LICENSE) file for details. In summary,
