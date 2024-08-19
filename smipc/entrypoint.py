@@ -77,20 +77,18 @@ def main(
     try:
         if args.cmd == CMD_SERVER:
             run_server(
-                root_dir=root_dir,
-                channel=channel,
+                root=root_dir,
+                key=channel,
                 use_cuda=use_cuda,
-                use_uvloop=use_uvloop,
                 printer=printer,
             )
         elif args.cmd == CMD_CLIENT:
             run_client(
-                root_dir=root_dir,
-                channel=channel,
+                root=root_dir,
+                key=channel,
                 iteration=iteration,
                 data_size=data_size,
                 use_cuda=use_cuda,
-                use_uvloop=use_uvloop,
                 printer=printer,
             )
     except BaseException as e:

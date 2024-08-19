@@ -1,58 +1,61 @@
 # -*- coding: utf-8 -*-
 
 import os
-from asyncio import sleep
+from datetime import datetime
+from time import sleep
 from typing import Callable, Optional
 
-from smipc.aio.run import aio_run
 from smipc.arguments import DEFAULT_CHANNEL, LOCAL_ROOT_DIR
-from smipc.decorators.override import override
-from smipc.server.aio.base import AioChannel
-from smipc.server.aio.echo import AioEchoServer
-
-
-class _AioEchoServer(AioEchoServer):
-    def __init__(
-        self,
-        root: str,
-        use_cuda: bool,
-        printer: Callable[..., None],
-    ):
-        super().__init__(root)
-        self._use_cuda = use_cuda
-        self._printer = printer
-
-    @override
-    async def on_recv(self, channel: AioChannel, data: bytes) -> None:
-        self._printer(f"recv: {len(data)}bytes")
-        await super().on_recv(channel, data)
-
-
-async def run_echo_server(
-    root_dir: str,
-    channel: str,
-    use_cuda: bool,
-    printer: Callable[..., None],
-) -> None:
-    server = _AioEchoServer(root_dir, use_cuda, printer)
-    server.open(channel)
-
-    while True:
-        await sleep(1.0)
+from smipc.server.base import BaseServer
 
 
 def run_server(
-    root_dir: Optional[str] = None,
-    channel=DEFAULT_CHANNEL,
+    root: Optional[str] = None,
+    key=DEFAULT_CHANNEL,
     use_cuda=False,
-    use_uvloop=False,
     printer: Callable[..., None] = print,
 ) -> None:
-    if not root_dir:
-        root_dir = os.path.join(os.getcwd(), LOCAL_ROOT_DIR)
+    if not root:
+        root = os.path.join(os.getcwd(), LOCAL_ROOT_DIR)
 
-    assert root_dir is not None
-    assert isinstance(root_dir, str)
-    assert len(channel) >= 1
+    assert root is not None
+    assert isinstance(root, str)
+    assert len(key) >= 1
 
-    aio_run(run_echo_server(root_dir, channel, use_cuda, printer), use_uvloop)
+    server = BaseServer(root)
+
+    printer(f"{datetime.now()} Channel[{key}] open() ...")
+    channel = server.open(key)
+    printer(f"{datetime.now()} Channel[{key}] open() -> OK")
+
+    printer(f"{datetime.now()} Channel[{key}] set blocking mode ...")
+    assert not channel.proto.pipe.reader.blocking
+    assert not channel.proto.pipe.writer.blocking
+    channel.proto.pipe.reader.blocking = True
+    channel.proto.pipe.writer.blocking = True
+    assert channel.proto.pipe.reader.blocking
+    assert channel.proto.pipe.writer.blocking
+    printer(f"{datetime.now()} Channel[{key}] set blocking mode -> OK")
+
+    try:
+        while True:
+            printer(f"{datetime.now()} Channel[{key}] recv() ...")
+            try:
+                request = channel.recv()
+            except BaseException as e:
+                printer(f"{datetime.now()} {type(e)}: {str(e)}")
+                sleep(1.0)
+                continue
+
+            if request is None:
+                printer(f"{datetime.now()} Channel[{key}] recv() -> None")
+                continue
+
+            printer(f"{datetime.now()} Channel[{key}] recv() -> {len(request)}bytes")
+
+            printer(f"{datetime.now()} Channel[{key}] send({len(request)}bytes) ...")
+            written = channel.send(request)
+            printer(f"{datetime.now()} Channel[{key}] send() -> {written}")
+    finally:
+        channel.close()
+        channel.cleanup()

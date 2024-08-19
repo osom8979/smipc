@@ -261,12 +261,12 @@ class BaseServer(BaseServerInterface):
     ):
         return Channel(key, proto, weak_base, fifos)
 
-    def create_server_channel(self, key: str):
+    def create_server_channel(self, key: str, blocking=False):
         # ------------------------------------------
         # [WARNING] Do not change the calling order.
         paths = self.get_path_pair(key)
         fifos = create_fifos(paths, self._mode)
-        pipe = create_pipe(paths, blocking=False, no_faker=False)
+        pipe = create_pipe(paths, blocking=blocking, no_faker=False)
         proto = create_proto(pipe, self._encoding, self._max_queue)
         # ------------------------------------------
         return self.on_create_channel(key, proto, ref(self), fifos)
@@ -277,11 +277,11 @@ class BaseServer(BaseServerInterface):
         proto = create_proto(pipe, self._encoding, self._max_queue)
         return self.on_create_channel(key, proto, None, None)
 
-    def open(self, key: str):
+    def open(self, key: str, blocking=False):
         if key in self._channels:
             raise KeyError(f"Already opened channel: '{key}'")
 
-        channel = self.create_server_channel(key)
+        channel = self.create_server_channel(key, blocking=blocking)
         self._channels[channel.key] = channel
         return channel
 
