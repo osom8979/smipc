@@ -4,7 +4,7 @@
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/smipc?style=flat-square)
 [![GitHub](https://img.shields.io/github/license/osom8979/smipc?style=flat-square)](https://github.com/osom8979/smipc/)
 
-Shared Memory IPC
+IPC using Shared Memory and PIPE
 
 ## Motivation
 
@@ -12,22 +12,26 @@ Shared Memory IPC
 
 ## Features
 
-...
+* Massive data uses shared memory.
+* Use of queues using Full-duplex PIPE.
+* CUDA IPC (using [cupy](https://cupy.dev/))
+* Support [asyncio](https://docs.python.org/3/library/asyncio.html) - *Working...*
+* Support Command-line - *Working...*
 
 ## Benchmark Test
-
-CUDA IPC:
-```shell
-./run --use-cuda server
-# after
-./run --use-cuda client
-```
 
 CPU IPC:
 ```shell
 ./run server
 # after
 ./run client
+```
+
+CUDA IPC:
+```shell
+./run --use-cuda server
+# after
+./run --use-cuda client
 ```
 
 ## Test Result
