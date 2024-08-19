@@ -13,6 +13,8 @@ def run_server(
     root: Optional[str] = None,
     key=DEFAULT_CHANNEL,
     use_cuda=False,
+    debug=False,
+    verbose=0,
     printer: Callable[..., None] = print,
 ) -> None:
     if not root:
@@ -22,40 +24,62 @@ def run_server(
     assert isinstance(root, str)
     assert len(key) >= 1
 
+    def _log_message(message: str, index: Optional[int] = None) -> str:
+        if index is not None:
+            if verbose >= 1:
+                return f"{datetime.now()} Channel[{key}] #{index:04} {message}"
+            else:
+                return f"Channel[{key}] #{index:04} {message}"
+        else:
+            if verbose >= 1:
+                return f"{datetime.now()} Channel[{key}] {message}"
+            else:
+                return f"Channel[{key}] {message}"
+
+    def log_info(message: str, index: Optional[int] = None) -> None:
+        printer(_log_message(message, index))
+
+    def log_debug(message: str, index: Optional[int] = None) -> None:
+        if debug:
+            printer(_log_message(message, index))
+
     server = BaseServer(root)
 
-    printer(f"{datetime.now()} Channel[{key}] open() ...")
+    log_info("open() ...")
     channel = server.open(key)
-    printer(f"{datetime.now()} Channel[{key}] open() -> OK")
+    log_info("open() -> OK")
 
-    printer(f"{datetime.now()} Channel[{key}] set blocking mode ...")
+    log_info("set blocking mode ...")
     assert not channel.proto.pipe.reader.blocking
     assert not channel.proto.pipe.writer.blocking
     channel.proto.pipe.reader.blocking = True
     channel.proto.pipe.writer.blocking = True
     assert channel.proto.pipe.reader.blocking
     assert channel.proto.pipe.writer.blocking
-    printer(f"{datetime.now()} Channel[{key}] set blocking mode -> OK")
+    log_info("set blocking mode -> OK")
 
+    count = 0
     try:
         while True:
-            printer(f"{datetime.now()} Channel[{key}] recv() ...")
+            log_debug("recv() ...", index=count)
             try:
                 request = channel.recv()
             except BaseException as e:
-                printer(f"{datetime.now()} {type(e)}: {str(e)}")
-                sleep(1.0)
+                if verbose >= 2:
+                    log_debug(f"{type(e)}: {str(e)}", index=count)
+                sleep(0.1)
                 continue
 
             if request is None:
-                printer(f"{datetime.now()} Channel[{key}] recv() -> None")
+                log_debug("recv() -> None", index=count)
                 continue
 
-            printer(f"{datetime.now()} Channel[{key}] recv() -> {len(request)}bytes")
+            log_debug(f"recv() -> {len(request)}bytes", index=count)
 
-            printer(f"{datetime.now()} Channel[{key}] send({len(request)}bytes) ...")
+            log_debug(f"send({len(request)}bytes) ...", index=count)
             written = channel.send(request)
-            printer(f"{datetime.now()} Channel[{key}] send() -> {written}")
+            log_debug(f"send() -> {written}", index=count)
+            count += 1
     finally:
         channel.close()
         channel.cleanup()

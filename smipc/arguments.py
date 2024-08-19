@@ -104,6 +104,20 @@ def default_argument_parser() -> ArgumentParser:
         help="Replace the event loop with uvloop",
     )
     parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        default=False,
+        help="Enable debugging mode",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="count",
+        default=0,
+        help="Be more verbose/talkative during the operation",
+    )
+    parser.add_argument(
         "--version",
         "-V",
         action="version",

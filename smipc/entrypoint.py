@@ -26,11 +26,15 @@ def main(
     assert isinstance(args.channel, str)
     assert isinstance(args.use_cuda, bool)
     assert isinstance(args.use_uvloop, bool)
+    assert isinstance(args.debug, bool)
+    assert isinstance(args.verbose, int)
 
     root_dir = args.root_dir
     channel = args.channel
     use_cuda = args.use_cuda
     use_uvloop = args.use_uvloop
+    debug = args.debug
+    verbose = args.verbose
 
     if not os.path.isdir(root_dir):
         printer(f"The pipe directory does not exist: '{root_dir}'")
@@ -80,6 +84,8 @@ def main(
                 root=root_dir,
                 key=channel,
                 use_cuda=use_cuda,
+                debug=debug,
+                verbose=verbose,
                 printer=printer,
             )
         elif args.cmd == CMD_CLIENT:
@@ -89,6 +95,8 @@ def main(
                 iteration=iteration,
                 data_size=data_size,
                 use_cuda=use_cuda,
+                debug=debug,
+                verbose=verbose,
                 printer=printer,
             )
     except BaseException as e:

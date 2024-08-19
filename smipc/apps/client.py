@@ -27,6 +27,8 @@ def run_client(
     iteration=DEFAULT_ITERATION,
     data_size=DEFAULT_DATA_SIZE,
     use_cuda=False,
+    debug=False,
+    verbose=0,
     printer: Callable[..., None] = print,
 ) -> None:
     if not root:
@@ -38,45 +40,64 @@ def run_client(
     assert iteration >= 1
     assert data_size >= 1
 
+    def _log_message(message: str, index: Optional[int] = None) -> str:
+        if index is not None:
+            if verbose >= 1:
+                return f"{datetime.now()} Channel[{key}] #{index:04} {message}"
+            else:
+                return f"Channel[{key}] #{index:04} {message}"
+        else:
+            if verbose >= 1:
+                return f"{datetime.now()} Channel[{key}] {message}"
+            else:
+                return f"Channel[{key}] {message}"
+
+    def log_info(message: str, index: Optional[int] = None) -> None:
+        printer(_log_message(message, index))
+
+    def log_debug(message: str, index: Optional[int] = None) -> None:
+        if debug:
+            printer(_log_message(message, index))
+
     request = b"\x00" * data_size
     total_duration = 0.0
     drop_first = True
     blocking = True
 
-    printer(f"{log_prefix(key)} open(blocking={blocking}) ...")
+    log_info(f"open(blocking={blocking}) ...")
     client = BaseClient.from_root(root, key, blocking=blocking)
-    printer(f"{log_prefix(key)} open() -> OK")
+    log_info("open() -> OK")
 
     try:
         for i in range(iteration):
-            printer(f"{log_prefix(key, i)} send({len(request)}bytes) ...")
+            if i % 100 == 0:
+                log_info(f"Iteration #{i}")
+
+            log_debug(f"send({len(request)}bytes) ...", index=i)
 
             send_begin = time()
             written = client.send(request)
             send_end = time()
 
             send_duration = send_end - send_begin
-            printer(
-                f"{log_prefix(key, i)} send() -> {written} "
-                f"(duration: {send_duration:.3f}s)"
-            )
+            log_debug(f"send() -> {written} (duration: {send_duration:.3f}s)", index=i)
 
-            printer(f"{log_prefix(key, i)} recv() ...")
+            log_debug("recv() ...", index=i)
             recv_begin = time()
             while True:
                 try:
                     response = client.recv()
                     if response is not None:
                         break
-                    printer(f"{log_prefix(key, i)} recv() -> None")
+                    log_debug("recv() -> None", index=i)
                 except BaseException as e:
-                    printer(f"{log_prefix(key, i)} {type(e)}: {str(e)}")
+                    log_debug(f"{type(e)}: {str(e)}", index=i)
             recv_end = time()
 
             recv_duration = recv_end - recv_begin
-            printer(
-                f"{log_prefix(key, i)} recv() -> {len(request)}bytes "
-                f"(duration: {recv_duration:.3f}s)"
+            log_debug(
+                f"recv() -> {len(request)}bytes (duration: {recv_duration:.3f}s)",
+                index=i,
             )
 
             duration = recv_end - send_begin
@@ -88,9 +109,9 @@ def run_client(
             if request != response:
                 raise ValueError("Request data and response data are different")
     except BaseException as e:
-        printer(f"{log_prefix(key)} {type(e)}: {str(e)}")
+        log_info(f"{type(e)}: {str(e)}")
     else:
         mean_duration = total_duration / (iteration - (1 if drop_first else 0))
-        printer(f"\nMean duration: {mean_duration:.3f}s (iteration={iteration})")
+        log_info(f"Mean duration: {mean_duration:.3f}s (iteration={iteration})")
     finally:
         client.close()
