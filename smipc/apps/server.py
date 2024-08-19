@@ -16,6 +16,7 @@ def run_server(
     key=DEFAULT_CHANNEL,
     iteration=DEFAULT_ITERATION,
     use_cuda=False,
+    use_cuda_kernel=False,
     debug=False,
     verbose=0,
     printer: Callable[..., None] = print,
@@ -26,6 +27,7 @@ def run_server(
     assert root is not None
     assert isinstance(root, str)
     assert len(key) >= 1
+    assert iteration >= 1
 
     def _log_message(message: str, index: Optional[int] = None) -> str:
         if index is not None:
@@ -63,7 +65,7 @@ def run_server(
 
     count = 0
     try:
-        while count < iteration:
+        while True:  # count < iteration:
             log_debug("recv() ...", index=count)
             try:
                 request = channel.recv()
@@ -86,14 +88,18 @@ def run_server(
                 with receiver:
                     receiver.wait_event()
 
-                    receiver.async_copy_device_to_host()
-                    receiver.synchronize()
+                    # ------------------------------------
+                    # If CPU synchronization is required:
+                    # receiver.async_copy_device_to_host()
+                    # receiver.synchronize()
+                    # ------------------------------------
 
-                    with receiver.stream:
-                        gpu = receiver.gpu
-                        gpu += 1
+                    if use_cuda_kernel:
+                        with receiver.stream:
+                            gpu = receiver.gpu
+                            gpu += 1
 
-                    receiver.record()
+                        receiver.record()
 
             log_debug(f"send({len(request)}bytes) ...", index=count)
             written = channel.send(request)
